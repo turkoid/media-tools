@@ -288,7 +288,7 @@ class Media:
 
     @property
     def ffmpeg_output(self) -> str:
-        cache_key = "config.ffmpeg_output"
+        cache_key = "ffmpeg_output"
         if cache_key not in self.cache:
             args = [
                 config.ffmpeg,
