@@ -7,7 +7,7 @@ import sys
 import time
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from config import Config
 
@@ -30,6 +30,54 @@ def parse_timestamp(timestamp: str) -> Decimal:
 
 
 @dataclass
+class FrameMetadata:
+    raw: str
+    filter: str
+    type: str
+    sub_type: Optional[str]
+    value: str
+
+    @property
+    def key(self):
+        sub_type = f"_{self.sub_type}" if self.sub_type else ""
+        return f"{self.filter}.{self.type}{sub_type}"
+
+    def __str__(self):
+        return f"{self.key}={self.value}"
+
+    def __repr__(self):
+        return str(self)
+
+
+@dataclass
+class FrameInfo:
+    raw: str
+    frame: int
+    pts: int
+    pts_time: Decimal
+    metadata: dict[str, FrameMetadata]
+
+    def __init__(
+        self,
+        raw: str,
+        frame: Union[str, int],
+        pts: Union[str, int],
+        pts_time: Union[str, Decimal],
+    ):
+        self.raw = raw
+        self.frame = frame if isinstance(frame, int) else int(frame)
+        self.pts = pts if isinstance(pts, int) else int(pts)
+        self.pts_time = pts_time if isinstance(pts_time, Decimal) else Decimal(pts_time)
+        self.metadata = {}
+
+    def __str__(self):
+        return f"frame: {self.frame} pts: {self.pts} pts_time: {self.pts_time}"
+
+    def __repr__(self):
+        return str(self)
+
+
+@dataclass
 class DetectMetadata:
     type: str
     sub_type: str
@@ -37,6 +85,14 @@ class DetectMetadata:
     pts: int
     pts_time: Decimal
     timestamp: Decimal
+
+    def __init__(self, frame_info: FrameInfo, frame_metadata: FrameMetadata):
+        self.type = frame_metadata.type
+        self.sub_type = frame_metadata.sub_type
+        self.frame = frame_info.frame
+        self.pts = frame_info.pts
+        self.pts_time = frame_info.pts_time
+        self.timestamp = Decimal(frame_metadata.value)
 
     @property
     def short_type(self) -> str:
@@ -49,12 +105,16 @@ class DetectMetadata:
         return self.frame / self.pts_time
 
     def output(self, include_type: bool = True, include_frame: bool = True) -> str:
-        type_part = f"[{self.short_type}] " if include_type else ""
-        frame_part = f" - {self.frame}" if include_frame else ""
+        sub_type = f"-{self.sub_type.upper()}" if self.sub_type else ""
+        type_part = f"[{self.short_type}{sub_type}] " if include_type else ""
+        frame_part = f" ({self.frame})" if include_frame else ""
         return f"{type_part}{format_timestamp(self.timestamp)}{frame_part}"
 
     def __str__(self):
         return self.output()
+
+    def __repr__(self):
+        return str(self)
 
 
 @dataclass
@@ -100,6 +160,9 @@ class DetectInterval:
     def __str__(self):
         return self.output()
 
+    def __repr__(self):
+        return str(self)
+
 
 def fps_adjusted_frame(secs: Decimal, fps: Decimal) -> int:
     return round(fps * secs)
@@ -140,8 +203,10 @@ def log_multiline(level, header, message):
 
 class Media:
     REGEX = r"^.+(S\d+E\d+)\.(.+)\.(.+)$"
+    FFMPEG_FRAME_LINE = r"frame:(\d+)\s+pts:(\d+)\s+pts_time:(-?\d+\.?\d*)"
+    FFMPEG_KEY_LINE = r"(.+)\.(.+?)(?:_([^_]+?))?=(-?\d+\.?\d*)"
 
-    def __init__(self, path: str, debug: bool = True):
+    def __init__(self, path: str):
         self.path: str = path
         self.cache: dict[str, Any] = {}
         self.detection_duration: float = 0.5
@@ -193,8 +258,21 @@ class Media:
             else:
                 logging.debug("cache file not found")
         if not stdout:
-            cp = subprocess.run(args, check=True, capture_output=True)
-            stdout = cp.stdout.decode()
+            try:
+                cp = subprocess.run(
+                    args, check=True, capture_output=True, universal_newlines=True
+                )
+                stdout = cp.stdout
+            except subprocess.CalledProcessError as e:
+                msg = [
+                    "Error calling process:",
+                    f"return_code: {e.returncode}",
+                    f"stdout:\n{e.stdout}",
+                    f"stderr:\n{e.stderr}",
+                ]
+                logging.error("\n".join(msg))
+                raise
+
             if cache_key:
                 with open(cache_file, mode="w") as fh:
                     fh.write(stdout)
@@ -311,83 +389,112 @@ class Media:
             self.cache[cache_key] = stdout
         return self.cache[cache_key]
 
-    def parse_ffmpeg_output(self):
-        black_frames_key = "black_frames"
-        silent_frames_key = "silent_frames"
-        if black_frames_key not in self.cache or silent_frames_key not in self.cache:
-
-            def create_metadata(frame_line: str, key_line: str) -> DetectMetadata:
-                frame_line_regex = r"\s*frame:(\d+)\s+pts:(\d+)\s+pts_time:(\d+)"
-                key_line_regex = r"lavfi\.(.+)_(.+)=([0-9.]+)"
-                if not (match := re.match(frame_line_regex, frame_line)):
-                    raise ValueError(f"frame match error: {frame_line}")
-                frame, pts, pts_time = match.groups()
-                if not (match := re.match(key_line_regex, key_line)):
-                    raise ValueError(f"key match error: {key_line}")
-                key_type, key_subtype, timestamp = match.groups()
-                metadata = DetectMetadata(
-                    key_type,
-                    key_subtype,
-                    int(frame),
-                    int(pts),
-                    Decimal(pts_time),
-                    Decimal(timestamp),
-                )
-                return metadata
-
-            lines = self.ffmpeg_output.splitlines()
-            black_frames = []
-            silent_frames = []
-            i = 0
-            while i + 2 < len(lines):
-                start = create_metadata(*lines[i : i + 2])
-                end = create_metadata(*lines[i + 2 : i + 4])
-                if start.type != end.type:
-                    start = end
-                    end = create_metadata(*lines[i + 4 : i + 6])
-                    i += 2
-                i += 4
-                if start.type == "black":
-                    black_frames.append(DetectInterval(start, end))
+    @property
+    def frames(self) -> list[FrameInfo]:
+        cache_key = "frames"
+        if cache_key not in self.cache:
+            ffmpeg_lines = [line.strip() for line in self.ffmpeg_output.splitlines()]
+            frames: list[FrameInfo] = []
+            frame: Optional[FrameInfo] = None
+            for line in ffmpeg_lines:
+                if match := re.match(Media.FFMPEG_FRAME_LINE, line):
+                    logging.debug(f"ffmpeg frame line: {line}")
+                    if frame:
+                        frames.append(frame)
+                    frame = FrameInfo(line, *match.groups())
+                elif match := re.match(Media.FFMPEG_KEY_LINE, line):
+                    logging.debug(f"ffmpeg metadata line: {line}")
+                    if not frame:
+                        raise ValueError(f"frame metadata found, but no frame: {line}")
+                    metadata = FrameMetadata(line, *match.groups())
+                    if metadata.key in frame.metadata:
+                        raise ValueError(
+                            f"metadata already exists [{frame.raw}]: {line}"
+                        )
+                    frame.metadata[metadata.key] = metadata
                 else:
-                    i += 1
-                    silent_frames.append(DetectInterval(start, end))
-            log_multiline(
-                logging.DEBUG,
-                "black frames:",
-                "\n".join(str(interval) for interval in black_frames),
-            )
-            log_multiline(
-                logging.DEBUG,
-                "silent frames:",
-                "\n".join(str(interval) for interval in silent_frames),
-            )
-            self.cache[black_frames_key] = black_frames
-            self.cache[silent_frames_key] = silent_frames
+                    raise ValueError(f"ffmpeg parsing error: {line}")
+            if frame:
+                frames.append(frame)
+            self.cache[cache_key] = frames
+        return self.cache[cache_key]
+
+    def detect_frames(self, cache_key: str, metadata_keys: list[str]):
+        if cache_key not in self.cache:
+            detect_frames = []
+            for frame in self.frames:
+                for key, metadata in frame.metadata.items():
+                    if key not in metadata_keys:
+                        continue
+                    detect_frame = DetectMetadata(frame, metadata)
+                    detect_frames.append(detect_frame)
+            self.cache[cache_key] = detect_frames
+        return self.cache[cache_key]
 
     @property
-    def black_frames(self) -> list[DetectInterval]:
-        self.parse_ffmpeg_output()
-        return self.cache["black_frames"]
+    def black_frames(self) -> list[DetectMetadata]:
+        return self.detect_frames(
+            "black_frames", ["lavfi.black_start", "lavfi.black_end"]
+        )
 
     @property
-    def silent_frames(self) -> list[DetectInterval]:
-        self.parse_ffmpeg_output()
-        return self.cache["silent_frames"]
+    def silent_frames(self) -> list[DetectMetadata]:
+        return self.detect_frames(
+            "silent_frames", ["lavfi.silence_start", "lavfi.silence_end"]
+        )
+
+    def intervals(
+        self, cache_key: str, frames: list[DetectMetadata]
+    ) -> list[DetectInterval]:
+        if cache_key not in self.cache:
+            intervals = []
+            i = 0
+            while i + 1 < len(frames):
+                start_frame = frames[i]
+                end_frame = frames[i + 1]
+                if start_frame.sub_type != "start" or end_frame.sub_type != "end":
+                    raise ValueError(
+                        f"expected start and end frames, got {start_frame} and {end_frame}"
+                    )
+                interval = DetectInterval(start_frame, end_frame)
+                intervals.append(interval)
+                i += 2
+            self.cache[cache_key] = intervals
+        return self.cache[cache_key]
+
+    @property
+    def black_intervals(self) -> list[DetectInterval]:
+        return self.intervals("black_intervals", self.black_frames)
+
+    @property
+    def silent_intervals(self) -> list[DetectInterval]:
+        return self.intervals("silent_intervals", self.silent_frames)
 
     @property
     def split_frames(self) -> list[SplitMetadata]:
         cache_key = "split_frames"
         if cache_key not in self.cache:
             split_frames = []
-            _black_frames = self.black_frames[:]
-            _silent_frames = self.silent_frames[:]
-            while _black_frames:
-                black_frame = _black_frames.pop(0)
-                for i, silence_frame in enumerate(_silent_frames):
-                    if black_frame.overlaps(silence_frame):
-                        split_frames.append(SplitMetadata(black_frame, silence_frame))
-                        _silent_frames.pop(i)
+            _black_intervals = self.black_intervals[:]
+            _silent_intervals = self.silent_intervals[:]
+            log_multiline(
+                logging.DEBUG,
+                f"black intervals:",
+                "\n".join(str(frame) for frame in _black_intervals),
+            )
+            log_multiline(
+                logging.DEBUG,
+                f"silent intervals:",
+                "\n".join(str(frame) for frame in _silent_intervals),
+            )
+            while _black_intervals:
+                black_interval = _black_intervals.pop(0)
+                for i, silent_interval in enumerate(_silent_intervals):
+                    if black_interval.overlaps(silent_interval):
+                        split_frames.append(
+                            SplitMetadata(black_interval, silent_interval)
+                        )
+                        _silent_intervals.pop(i)
                         break
             log_multiline(
                 logging.INFO,
