@@ -28,7 +28,7 @@ class Media:
     FFMPEG_KEY_LINE = r"(.+)\.(.+?)(?:_([^_]+?))?=(-?\d+\.?\d*)"
 
     def __init__(self, path: str, output_folder: str, config: SmartSplitterConfig):
-        self.path: str = os.path.realpath(path)
+        self.path: str = os.path.abspath(path)
         self.output_folder: str = output_folder
         self.config: SmartSplitterConfig = config
         self.cache: dict[str, Any] = {}

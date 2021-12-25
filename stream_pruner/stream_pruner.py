@@ -13,7 +13,7 @@ class StreamPruner(Tool):
         super().__init__(parsed_args)
         self.config = Config(parsed_args.config)
         self.validate()
-        self.input = os.path.realpath(parsed_args.input)
+        self.input = os.path.abspath(parsed_args.input)
         if not os.path.exists(self.input):
             raise FileNotFoundError(self.input)
         self._output_path: Optional[str] = None
