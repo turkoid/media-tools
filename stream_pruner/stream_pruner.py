@@ -33,6 +33,7 @@ class StreamPruner(Tool):
 
     def run(self):
         media_files = self.build_media_files()
+        os.makedirs(self.output_path, exist_ok=True)
         self.prune_files(media_files)
 
     def _filter_video_tracks(self, data: MkvData) -> list[VideoTrack]:
