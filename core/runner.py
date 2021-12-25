@@ -1,8 +1,8 @@
 import argparse
 import os
 
-from smart_splitter.smart_splitter import SmartSplitter
-from media_tools.utils import initialize_logger, log_exception
+from smart_splitter.tool import SmartSplitter
+from core.utils import initialize_logger, log_exception
 
 
 def create_parser() -> argparse.ArgumentParser:

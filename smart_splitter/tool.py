@@ -3,12 +3,12 @@ import os
 import re
 from functools import partial
 
-from media_tools import utils
-from media_tools.tool import Tool
+from core import utils
+from core.tool import Tool
 from smart_splitter.media import Media
 from decimal import Decimal
-from smart_splitter.smart_splitter_config import SmartSplitterConfig
-from media_tools.utils import mime_type
+from smart_splitter.config import SmartSplitterConfig
+from core.utils import mime_type
 
 
 class SmartSplitter(Tool):

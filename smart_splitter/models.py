@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional, Union
 
-from media_tools.utils import format_timestamp, fps_adjusted_frame
+from core.utils import format_timestamp, fps_adjusted_frame
 
 
 @dataclass

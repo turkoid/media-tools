@@ -5,7 +5,7 @@ from argparse import Namespace
 from decimal import Decimal
 from typing import Optional, Pattern, Any
 
-from media_tools.config import Config, ConfigAttr
+from core.config import Config, ConfigAttr
 
 
 class SmartSplitterConfig(Config):

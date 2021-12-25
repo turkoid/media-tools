@@ -6,7 +6,7 @@ import subprocess
 from decimal import Decimal
 from typing import Any, Optional
 
-from smart_splitter.smart_splitter_config import SmartSplitterConfig
+from smart_splitter.config import SmartSplitterConfig
 from smart_splitter.models import (
     FrameInfo,
     FrameMetadata,
@@ -14,7 +14,7 @@ from smart_splitter.models import (
     DetectInterval,
     SplitMetadata,
 )
-from media_tools.utils import init_logging_handler, log_multiline, parse_timestamp
+from core.utils import init_logging_handler, log_multiline, parse_timestamp
 
 
 class Media:
