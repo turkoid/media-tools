@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from smart_splitter.tool import SmartSplitter
+from smart_splitter.smart_splitter import SmartSplitter
 from core.utils import initialize_logger, log_exception
 
 
