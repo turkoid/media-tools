@@ -12,6 +12,7 @@ from smart_splitter.models import (
     DetectMetadata,
     DetectInterval,
     SplitMetadata,
+    Clip,
 )
 from core.utils import (
     init_logging_handler,
@@ -304,26 +305,27 @@ class Media:
             self.cache[cache_key] = split_frames
         return self.cache[cache_key]
 
+    def clip(self, start: SplitMetadata, end: Optional[SplitMetadata]) -> Clip:
+        frame_start = start.adjusted_start_frame(self.video_fps)
+        clip_start = start.average_start_timestamp()
+        if end:
+            frame_end = end.adjusted_start_frame(self.video_fps)
+            clip_end = end.average_start_timestamp()
+        else:
+            frame_end = self.video_frame_count
+            clip_end = self.video_duration
+        return Clip(frame_start, frame_end, clip_start, clip_end)
+
     def split(self):
         index = 0
-        while index < len(self.split_intervals):
-            split_frame = self.split_intervals[index]
-            frame_start = split_frame.adjusted_start_frame(self.video_fps)
-            clip_start = split_frame.average_start_timestamp()
-            if index + 1 < len(self.split_intervals):
-                next_split_frame = self.split_intervals[index + 1]
-                frame_end = next_split_frame.adjusted_start_frame(self.video_fps)
-                clip_end = next_split_frame.average_start_timestamp()
-            else:
-                frame_end = self.video_frame_count
-                clip_end = self.video_duration
-            frame_duration = frame_end - frame_start
-            clip_duration = clip_end - clip_start
+        intervals = [*self.split_intervals, None]
+        while index < len(intervals) - 1:
+            clip = self.clip(*intervals[index : index + 2])
             clip_file = f"{index:0>3}{self.extension}"
             clip_path = os.path.join(self.output_folder, clip_file)
             incomplete_clip_path = f"{clip_path}.incomplete"
             logging.info(
-                f"Encoding {frame_duration} frames ({frame_start}-{frame_end}) -> {clip_file} [{format_timestamp(clip_duration)}]"
+                f"Encoding {clip.frames} frames ({clip.frame_start}-{clip.frame_end}) -> {clip_file} [{format_timestamp(clip.duration)}]"
             )
             index += 1
             if os.path.exists(clip_path):
@@ -332,11 +334,10 @@ class Media:
             if os.path.exists(incomplete_clip_path):
                 logging.debug(f"removing incomplete: {incomplete_clip_path}")
                 os.remove(incomplete_clip_path)
-            if clip_duration < self.config.min_duration:
-                logging.info(
-                    f"{clip_file} duration ({clip_duration}) < min_duration ({self.config.min_duration})"
+            if clip.duration < self.config.min_duration:
+                logging.warning(
+                    f"{clip_file} duration ({clip.duration}) < min_duration ({self.config.min_duration})."
                 )
-                continue
             args = [
                 self.config.handbrake_cli,
                 "--preset-import-file",
@@ -345,9 +346,9 @@ class Media:
                 self.config.handbrake_preset,
                 "--no-markers",
                 "--start-at",
-                f"frames:{frame_start}",
+                f"frames:{clip.frame_start}",
                 "--stop-at",
-                f"frames:{frame_duration}",
+                f"frames:{clip.frame_end}",
                 "-i",
                 self.path,
                 "-o",

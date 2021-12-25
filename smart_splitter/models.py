@@ -167,3 +167,19 @@ class SplitMetadata:
 
     def __str__(self):
         return self.output()
+
+
+@dataclass
+class Clip:
+    frame_start: int
+    frame_end: int
+    time_start: Decimal
+    time_end: Decimal
+
+    @property
+    def frames(self):
+        return self.frame_end - self.frame_start
+
+    @property
+    def duration(self):
+        return self.time_end - self.time_start
