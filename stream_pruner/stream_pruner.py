@@ -18,9 +18,9 @@ class StreamPruner(Tool):
         else:
             self.input_directory = os.path.dirname(self.input)
         self.output_directory: Optional[str] = parsed_args.output_directory
-        output_path = os.path.join(self.input_directory, self.output_directory)
-        if self.output_directory is None:
-            output_path = os.path.join(output_path, "pruned")
+        output_path = os.path.join(
+            self.input_directory, self.output_directory or "pruned"
+        )
         self.output_path = os.path.abspath(output_path)
         self.validate()
 
