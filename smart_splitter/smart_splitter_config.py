@@ -2,54 +2,10 @@ import logging
 import os
 import re
 from argparse import Namespace
-from dataclasses import dataclass
 from decimal import Decimal
-from typing import Optional, Pattern, Type, Any
+from typing import Optional, Pattern, Any
 
-import yaml
-
-
-class Config:
-    def __init__(self, config_path: str):
-        self.config_path = config_path
-        with open(config_path) as fh:
-            self.data: dict = yaml.safe_load(fh)
-
-    @property
-    def executables(self) -> dict[str, str]:
-        return self.data["executables"]
-
-    @property
-    def ffmpeg(self) -> str:
-        return self.executables["ffmpeg"]
-
-    @property
-    def ffprobe(self) -> str:
-        return self.executables["ffprobe"]
-
-    @property
-    def mkvmerge(self) -> str:
-        return self.executables["mkvmerge"]
-
-    @property
-    def handbrake_cli(self) -> str:
-        return self.executables["handbrake_cli"]
-
-    @property
-    def smart_splitter(self):
-        return self.data["smart_splitter"]
-
-
-@dataclass
-class ConfigAttr:
-    name: str
-    config_name: Optional[str] = None
-    arg_name: Optional[str] = None
-    type: Optional[Type] = None
-
-    def __post_init__(self):
-        self.config_name = self.config_name or self.name
-        self.arg_name = self.arg_name or self.name
+from media_tools.config import Config, ConfigAttr
 
 
 class SmartSplitterConfig(Config):
@@ -92,9 +48,9 @@ class SmartSplitterConfig(Config):
     def _load_from_config(self):
         logging.debug(f"overriding config values from config file {self.config_path}")
         for attr in self.attrs.values():
-            if attr.config_name not in self.smart_splitter:
+            if attr.config_name not in self.data["smart_splitter"]:
                 continue
-            config_value = self.smart_splitter[attr.config_name]
+            config_value = self.data["smart_splitter"][attr.config_name]
             self._setattr(attr, config_value)
 
     def load_from_parsed_args(self, parsed_args: Namespace):
@@ -102,7 +58,7 @@ class SmartSplitterConfig(Config):
         for attr in self.attrs.values():
             if attr.arg_name not in parsed_args:
                 continue
-            arg_value = parsed_args[attr.arg_name]
+            arg_value = getattr(parsed_args, attr.arg_name)
             self._setattr(attr, arg_value)
 
     @property
@@ -125,11 +81,11 @@ class SmartSplitterConfig(Config):
 
     @property
     def handbrake_presets_import(self) -> str:
-        return self.smart_splitter["handbrake_presets_import"]
+        return self.data["smart_splitter"]["handbrake_presets_import"]
 
     @property
     def handbrake_preset(self) -> str:
-        return self.smart_splitter["handbrake_preset"]
+        return self.data["smart_splitter"]["handbrake_preset"]
 
     def validate(self):
         for path in [

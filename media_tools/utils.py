@@ -3,10 +3,9 @@ import sys
 import time
 from decimal import Decimal
 import magic
-from . import DEBUG_LOG_PATH
 
 
-def initialize_logger():
+def initialize_logger(debug_file_path: str):
     logger = logging.getLogger()
     if logger.hasHandlers():
         logging.debug(f"logger has already been initialized")
@@ -16,13 +15,13 @@ def initialize_logger():
     sh.addFilter(lambda record: 0 if record.exc_info else 1)
     init_logging_handler(sh, logging.INFO)
     logger.addHandler(sh)
-    fh = logging.FileHandler(filename=DEBUG_LOG_PATH, mode="w")
+    fh = logging.FileHandler(filename=debug_file_path, mode="w")
     init_logging_handler(fh)
     logger.addHandler(fh)
 
 
-def log_exception(e: Exception, msg: str = ""):
-    logging.error(f"An error occurred, check {DEBUG_LOG_PATH} for more details...")
+def log_exception(e: Exception, log_file_path: str, msg: str = ""):
+    logging.error(f"An error occurred, check {log_file_path} for more details...")
     if msg:
         logging.error(msg)
     logging.exception(e)

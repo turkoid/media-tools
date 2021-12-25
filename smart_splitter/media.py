@@ -6,15 +6,15 @@ import subprocess
 from decimal import Decimal
 from typing import Any, Optional
 
-from config import SmartSplitterConfig
-from models import (
+from smart_splitter.smart_splitter_config import SmartSplitterConfig
+from smart_splitter.models import (
     FrameInfo,
     FrameMetadata,
     DetectMetadata,
     DetectInterval,
     SplitMetadata,
 )
-from utils import init_logging_handler, log_multiline, parse_timestamp
+from media_tools.utils import init_logging_handler, log_multiline, parse_timestamp
 
 
 class Media:
@@ -22,11 +22,10 @@ class Media:
     FFMPEG_KEY_LINE = r"(.+)\.(.+?)(?:_([^_]+?))?=(-?\d+\.?\d*)"
 
     def __init__(self, path: str, output_folder: str, config: SmartSplitterConfig):
-        self.config = config
         self.path: str = os.path.realpath(path)
+        self.output_folder: str = output_folder
+        self.config: SmartSplitterConfig = config
         self.cache: dict[str, Any] = {}
-        self.detection_duration: float = 0.5
-        self._output_folder: str = os.path.realpath(output_folder)
         self.extension: str = os.path.splitext(path)[1]
         self.init_logger()
         self.log_basic_info()

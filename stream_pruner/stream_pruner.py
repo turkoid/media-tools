@@ -4,10 +4,6 @@ import subprocess
 import sys
 from typing import Optional
 
-from config import Config
-
-config = Config()
-
 
 def parse_mkv(data: str):
     parsed_data = json.loads(data)
