@@ -1,6 +1,5 @@
 import argparse
 import os
-import sys
 
 from smart_splitter.smart_splitter import SmartSplitter
 from media_tools.utils import initialize_logger, log_exception
@@ -32,7 +31,3 @@ def run(args_without_script: list[str]):
         log_exception(exc, debug_file_path, f"File not found: {exc}")
     except Exception as exc:
         log_exception(exc, debug_file_path)
-
-
-if __name__ == "__main__":
-    run(sys.argv[1:])
