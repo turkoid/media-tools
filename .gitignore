@@ -252,3 +252,4 @@ cython_debug/
 
 sandbox.py
 config.yaml
+script.py
