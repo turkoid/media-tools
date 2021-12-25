@@ -4,7 +4,7 @@ from typing import Optional
 
 from core.config import Config
 from core.tool import Tool
-from core.utils import run_process, log_file_header
+from core.utils import run_process, log_file_header, validate_paths
 from stream_pruner.models import SubtitleTrack, MkvData, AudioTrack, VideoTrack
 
 
@@ -12,23 +12,28 @@ class StreamPruner(Tool):
     def __init__(self, parsed_args):
         super().__init__(parsed_args)
         self.config = Config(parsed_args.config)
-        self.validate()
         self.input = os.path.abspath(parsed_args.input)
-        if not os.path.exists(self.input):
-            raise FileNotFoundError(self.input)
-        self._output_path: Optional[str] = None
+        if os.path.isdir(self.input):
+            self.input_directory = self.input
+        else:
+            self.input_directory = os.path.dirname(self.input)
+        self.output_directory: Optional[str] = parsed_args.output_directory
+        output_path = os.path.join(self.input_directory, self.output_directory)
+        if self.output_directory is None:
+            output_path = os.path.join(output_path, "pruned")
+        self.output_path = os.path.abspath(output_path)
+        self.validate()
 
     def validate(self):
-        pass
+        validate_paths(self.config.mkvmerge, self.input)
+        if os.path.samefile(self.input_directory, self.output_path):
+            raise ValueError(
+                f"output directory must be different then the input directory"
+            )
 
     def run(self):
         media_files = self.build_media_files()
         self.prune_files(media_files)
-
-    def output_path(self, media_file: str) -> str:
-        if not self._output_path:
-            self._output_path = os.path.join(os.path.dirname(media_file), "pruned")
-        return self._output_path
 
     def _filter_video_tracks(self, data: MkvData) -> list[VideoTrack]:
         tracks = []
@@ -89,9 +94,7 @@ class StreamPruner(Tool):
             return
         audio_tracks = self._filter_audio_tracks(data)
         subtitle_tracks = self._filter_subtitle_tracks(data, audio_tracks[0].language)
-        pruned_file = os.path.join(
-            self.output_path(media_file), os.path.basename(media_file)
-        )
+        pruned_file = os.path.join(self.output_path, os.path.basename(media_file))
         args = [
             self.config.mkvmerge,
             "-o",
@@ -145,5 +148,5 @@ class StreamPruner(Tool):
         parser.add_argument(
             "--output-directory",
             "-o",
-            help="directory to store pruned files (defaults to path relative to input file)",
+            help="directory to store pruned files (defaults to path relative to input file/directory)",
         )
