@@ -24,23 +24,26 @@ class SmartSplitter(Tool):
         media_files = self.build_media_files()
         self.split_files(media_files)
 
-    def output_folder(self, media_file: str, create: bool = True) -> Optional[str]:
-        if not self.config.output_directory:
-            self.config.output_directory = os.path.dirname(media_file)
+    def output_path(self, media_file: str, create: bool = True) -> Optional[str]:
+        input_directory = os.path.dirname(media_file)
         basename = os.path.basename(media_file)
         if not self.config.input_pattern:
-            output_folder = os.path.splitext(basename)[0]
+            media_output = os.path.splitext(basename)[0]
         elif match := self.config.input_pattern.match(basename):
-            output_folder = "_".join(match.groups())
+            media_output = "_".join(match.groups()).strip()
+            if not media_output:
+                raise ValueError(f"input pattern matched returned zero length string")
         else:
             logging.warning(
                 f"input pattern was specified, but no match was found. skipping..."
             )
-            output_folder = None
-        if create and output_folder:
-            output_path = os.path.join(self.config.output_directory, output_folder)
+            return
+        output_path = os.path.join(
+            input_directory, self.config.output_directory or "", media_output
+        )
+        if create:
             os.makedirs(output_path, exist_ok=True)
-        return output_folder
+        return output_path
 
     def check_media_id(self, output_path: str, media_id: str):
         media_id_file = os.path.join(output_path, ".media")
@@ -61,10 +64,9 @@ class SmartSplitter(Tool):
 
     def split_media(self, media_file: str):
         log_file_header(media_file)
-        output_folder = self.output_folder(media_file)
-        if not output_folder:
+        output_path = self.output_path(media_file)
+        if not output_path:
             return
-        output_path = os.path.join(self.config.output_directory, output_folder)
         self.check_media_id(output_path, os.path.basename(media_file))
         logging.info(f"\nOUTPUT: {output_path}")
         media = Media(
