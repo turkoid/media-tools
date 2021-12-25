@@ -5,14 +5,15 @@ from decimal import Decimal
 import magic
 
 
-def initialize_logger(debug_file_path: str):
+def initialize_logger(debug_file_path: str, debug_mode: bool = False):
     logger = logging.getLogger()
     if logger.hasHandlers():
         logging.debug(f"logger has already been initialized")
         return
     logger.setLevel(logging.DEBUG)
     sh = logging.StreamHandler(sys.stdout)
-    sh.addFilter(lambda record: 0 if record.exc_info else 1)
+    if not debug_mode:
+        sh.addFilter(lambda record: 0 if record.exc_info else 1)
     init_logging_handler(sh, logging.INFO)
     logger.addHandler(sh)
     fh = logging.FileHandler(filename=debug_file_path, mode="w")
@@ -30,9 +31,7 @@ def log_exception(e: Exception, log_file_path: str, msg: str = ""):
 
 def init_logging_handler(handler: logging.Handler, level=logging.DEBUG):
     handler.setLevel(level)
-    formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter("%(asctime)s | %(levelname)s - %(message)s")
     handler.setFormatter(formatter)
 
 

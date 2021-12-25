@@ -122,7 +122,7 @@ class DetectInterval:
 
     @property
     def frames(self):
-        return f"{self.start.frame}:{self.end.frame}"
+        return f"{self.start.frame}-{self.end.frame}"
 
     @property
     def fps(self) -> Decimal:
@@ -130,7 +130,7 @@ class DetectInterval:
 
     def output(self, include_types: bool = True, include_frames: bool = True):
         type_part = f"[{self.type}] " if include_types else ""
-        frame_part = f" {self.frames}" if include_frames else ""
+        frame_part = f" | {self.frames}" if include_frames else ""
         return f"{type_part}{self.timestamp_range}{frame_part}"
 
     def __str__(self):
@@ -159,11 +159,11 @@ class SplitMetadata:
     def average_start_timestamp(self) -> Decimal:
         return (self.silent_frame.start.timestamp + self.silent_frame.end.timestamp) / 2
 
-    def output(self, video_fps: Optional[Decimal] = None):
+    def output(self, video_fps: Optional[Decimal] = None, prefix=""):
         video_fps = video_fps or self.black_frame.fps
         start_frame = self.adjusted_silent_start_frame(video_fps)
         end_frame = self.adjusted_silent_end_frame(video_fps)
-        return f"{self.black_frame}\n{self.silent_frame} | {start_frame}:{end_frame}"
+        return f"{prefix}{self.black_frame}\n{prefix}{self.silent_frame} ({start_frame}-{end_frame})"
 
     def __str__(self):
         return self.output()

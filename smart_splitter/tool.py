@@ -50,6 +50,8 @@ class SmartSplitter(Tool):
 
     def split_files(self, media_files: list[str]):
         for media_file in media_files:
+            if not self.config.output_directory:
+                self.config.output_directory = os.path.dirname(media_file)
             old_handlers = logging.getLogger().handlers[:]
             basename = os.path.basename(media_file)
             try:
@@ -74,15 +76,16 @@ class SmartSplitter(Tool):
                         media_id_file_path = fh.read()
                     if media_id_file_path != basename:
                         raise ValueError(
-                            f"{output_folder} contains output for {media_id_file_path}"
+                            f"'{output_folder}' contains output for '{media_id_file_path}'"
                         )
                 else:
                     if os.listdir(output_folder):
                         logging.warning(
                             f"{output_folder} missing .media file, but contains files."
                         )
-                    with open(media_id_file) as fh:
+                    with open(media_id_file, "w") as fh:
                         fh.write(basename)
+                logging.info(f"\nOUTPUT: {output_folder}")
                 media = Media(
                     media_file,
                     output_folder,
@@ -91,6 +94,10 @@ class SmartSplitter(Tool):
                 media.split()
             except Exception as exc:
                 # catch errors here, so we can continue with the remaining files
+                if isinstance(Exception, FileNotFoundError):
+                    logging.error(f"File not found: {exc}")
+                else:
+                    logging.error(exc)
                 logging.error(f"!! An error was detected. Aborting...")
                 logging.exception(exc)
             finally:

@@ -73,7 +73,7 @@ class SmartSplitterConfig(Config):
     @property
     def silencedetect_options(self):
         if self._silencedetect_options is None:
-            return f"n=-{self.silence_noise_tolerance}dB:d={self.silence_min_duration}"
+            return f"n={self.silence_noise_tolerance}dB:d={self.silence_min_duration}"
 
     @silencedetect_options.setter
     def silencedetect_options(self, value):

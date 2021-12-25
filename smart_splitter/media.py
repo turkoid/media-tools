@@ -14,7 +14,12 @@ from smart_splitter.models import (
     DetectInterval,
     SplitMetadata,
 )
-from core.utils import init_logging_handler, log_multiline, parse_timestamp
+from core.utils import (
+    init_logging_handler,
+    log_multiline,
+    parse_timestamp,
+    format_timestamp,
+)
 
 
 class Media:
@@ -32,11 +37,13 @@ class Media:
 
     def log_basic_info(self):
         for stream_type in ["video", "audio"]:
-            logging.info(
+            logging.debug(
                 f"{stream_type} frame count: {self.stream_frame_count(stream_type)}"
             )
-            logging.info(f"{stream_type} duration: {self.stream_duration(stream_type)}")
-            logging.info(f"{stream_type} fps: {self.stream_fps(stream_type)}")
+            logging.debug(
+                f"{stream_type} duration: {self.stream_duration(stream_type)}"
+            )
+            logging.debug(f"{stream_type} fps: {self.stream_fps(stream_type)}")
 
     def init_logger(self):
         log_file = os.path.join(self.output_folder, "output.log")
@@ -56,7 +63,7 @@ class Media:
         cache_file = os.path.join(self.cache_directory, f"{cache_key}.txt")
         if cache_key:
             if os.path.exists(cache_file):
-                logging.info(f"reading from cached output: {cache_file}")
+                logging.debug(f"reading from cached output: {cache_file}")
                 with open(cache_file) as fh:
                     stdout = fh.read()
                 if not stdout:
@@ -65,10 +72,15 @@ class Media:
                 logging.debug("cache file not found")
         if not stdout:
             try:
+                command = " ".join(args)
+                if cache_key:
+                    logging.info(f"\nBuilding cached output: {command}")
+                logging.debug(f"\n+ BEGIN calling {command}")
                 cp = subprocess.run(
                     args, check=True, capture_output=True, universal_newlines=True
                 )
                 stdout = cp.stdout
+                logging.debug(f"\n+ END calling {command}")
             except subprocess.CalledProcessError as e:
                 msg = [
                     "Error calling process:",
@@ -175,9 +187,9 @@ class Media:
                 "-i",
                 self.path,
                 "-af",
-                f"silencedetect={self.config.blackdetect_options},ametadata=mode=print:file=-",
+                f"silencedetect={self.config.silencedetect_options},ametadata=mode=print:file=-",
                 "-vf",
-                f"blackdetect={self.config.silencedetect_options},metadata=mode=print:file=-",
+                f"blackdetect={self.config.blackdetect_options},metadata=mode=print:file=-",
                 "-sn",
                 "-f",
                 "null",
@@ -270,7 +282,7 @@ class Media:
         return self.intervals("silent_intervals", self.silent_frames)
 
     @property
-    def split_frames(self) -> list[SplitMetadata]:
+    def split_intervals(self) -> list[SplitMetadata]:
         cache_key = "split_frames"
         if cache_key not in self.cache:
             split_frames = []
@@ -295,39 +307,52 @@ class Media:
                         )
                         _silent_intervals.pop(i)
                         break
+            split_frame_log = []
+            for i, interval in enumerate(split_frames):
+                clip_file = f"{i:0>3}{self.extension}:"
+                split_frame_log.append(clip_file)
+                split_frame_log.append(interval.output(prefix="  "))
             log_multiline(
                 logging.INFO,
                 "split_frames:",
-                f"\n|\n".join(str(split) for split in split_frames),
+                f"\n".join(split_frame_log),
             )
             self.cache[cache_key] = split_frames
         return self.cache[cache_key]
 
     def split(self):
         index = 0
-        while index < len(self.split_frames):
-            split_frame = self.split_frames[index]
+        while index < len(self.split_intervals):
+            split_frame = self.split_intervals[index]
             frame_start = split_frame.adjusted_start_frame(self.video_fps)
-            if index + 1 < len(self.split_frames):
-                next_split_frame = self.split_frames[index + 1]
+            clip_start = split_frame.average_start_timestamp()
+            if index + 1 < len(self.split_intervals):
+                next_split_frame = self.split_intervals[index + 1]
                 frame_end = next_split_frame.adjusted_start_frame(self.video_fps)
+                clip_end = next_split_frame.average_start_timestamp()
             else:
                 frame_end = self.video_frame_count
+                clip_end = self.video_duration
             frame_duration = frame_end - frame_start
-            output_path = os.path.join(
-                self.output_folder, f"{index:0>3}.{self.extension}"
-            )
-            incomplete_output_path = f"{output_path}.incomplete"
+            clip_duration = clip_end - clip_start
+            clip_file = f"{index:0>3}{self.extension}"
+            clip_path = os.path.join(self.output_folder, clip_file)
+            incomplete_clip_path = f"{clip_path}.incomplete"
             logging.info(
-                f"Encoding {frame_start} -> {frame_end} = {frame_duration} -> {output_path}"
+                f"Encoding {frame_duration} frames ({frame_start}-{frame_end}) -> {clip_file} [{format_timestamp(clip_duration)}]"
             )
             index += 1
-            if os.path.exists(output_path):
-                logging.warning(f"skipping {output_path}")
+            if os.path.exists(clip_path):
+                logging.warning(f"{clip_file} already exists. skipping...")
                 continue
-            if os.path.exists(incomplete_output_path):
-                logging.debug(f"removing incomplete: {incomplete_output_path}")
-                os.remove(incomplete_output_path)
+            if os.path.exists(incomplete_clip_path):
+                logging.debug(f"removing incomplete: {incomplete_clip_path}")
+                os.remove(incomplete_clip_path)
+            if clip_duration < self.config.min_duration:
+                logging.info(
+                    f"{clip_file} duration ({clip_duration}) < min_duration ({self.config.min_duration})"
+                )
+                continue
             args = [
                 self.config.handbrake_cli,
                 "--preset-import-file",
@@ -342,10 +367,11 @@ class Media:
                 "-i",
                 self.path,
                 "-o",
-                incomplete_output_path,
+                incomplete_clip_path,
             ]
             self.run_process(args)
             logging.debug(
-                f"renaming {os.path.basename(incomplete_output_path)} -> {os.path.basename(output_path)}"
+                f"renaming {os.path.basename(incomplete_clip_path)} -> {clip_file}"
             )
-            os.rename(incomplete_output_path, output_path)
+            os.rename(incomplete_clip_path, clip_path)
+            logging.info("...done!")
