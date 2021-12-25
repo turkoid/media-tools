@@ -36,7 +36,7 @@ class Tool(ABC):
         media_files = []
         for entry in os.listdir(self.input):
             full_path = os.path.join(self.input, entry)
-            if os.path.isdir(entry):
+            if os.path.isdir(full_path):
                 logging.debug(f"skipping directory {full_path}")
                 continue
             media_type = mime_type(full_path)
