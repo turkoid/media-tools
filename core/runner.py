@@ -3,6 +3,7 @@ import os
 
 from smart_splitter.smart_splitter import SmartSplitter
 from core.utils import initialize_logger, log_exception
+from stream_pruner.stream_pruner import StreamPruner
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -14,7 +15,7 @@ def create_parser() -> argparse.ArgumentParser:
         "--debug", action="store_true", help="prints stack traces to stdout if enabled"
     )
     subparsers = parser.add_subparsers(help="commands", dest="tool", required=True)
-    for tool in [SmartSplitter]:
+    for tool in [SmartSplitter, StreamPruner]:
         tool.create_parser(subparsers)
     return parser
 

@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 from argparse import Namespace
 from decimal import Decimal
@@ -86,16 +85,3 @@ class SmartSplitterConfig(Config):
     @property
     def handbrake_preset(self) -> str:
         return self.data["smart_splitter"]["handbrake_preset"]
-
-    def validate(self):
-        for path in [
-            self.ffmpeg,
-            self.ffprobe,
-            self.handbrake_cli,
-            self.handbrake_presets_import,
-        ]:
-            if not os.path.exists(path):
-                raise FileNotFoundError(path)
-        with open(self.handbrake_presets_import) as fh:
-            if self.handbrake_preset not in fh.read():
-                raise ValueError(f"handbrake preset not found: {self.handbrake_preset}")

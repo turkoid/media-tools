@@ -1,4 +1,6 @@
 import logging
+import os
+import subprocess
 import sys
 import time
 from decimal import Decimal
@@ -65,3 +67,35 @@ def mime_type(path: str) -> str:
 
 def is_video_file(mime: str) -> bool:
     return mime.split("/")[0] == "video"
+
+
+def validate_paths(*paths: str):
+    for path in paths:
+        if not os.path.exists(path):
+            raise FileNotFoundError(path)
+
+
+def run_process(args: list[str]) -> str:
+    try:
+        command = " ".join(args)
+        logging.debug(f"\n+ BEGIN calling {command}")
+        cp = subprocess.run(
+            args, check=True, capture_output=True, universal_newlines=True
+        )
+        logging.debug(f"\n+ END calling {command}")
+        return cp.stdout
+    except subprocess.CalledProcessError as e:
+        msg = [
+            "Error calling process:",
+            f"return_code: {e.returncode}",
+            f"stdout:\n{e.stdout}",
+            f"stderr:\n{e.stderr}",
+        ]
+        logging.error("\n".join(msg))
+        raise
+
+
+def log_file_header(media_file: str):
+    basename = os.path.basename(media_file)
+    line = "*" * (len(basename) + 4)
+    logging.info(f"\n{line}\n* {basename} *\n{line}")

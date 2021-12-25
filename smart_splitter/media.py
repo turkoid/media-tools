@@ -2,7 +2,6 @@ import json
 import logging
 import os
 import re
-import subprocess
 from decimal import Decimal
 from typing import Any, Optional
 
@@ -19,6 +18,7 @@ from core.utils import (
     log_multiline,
     parse_timestamp,
     format_timestamp,
+    run_process,
 )
 
 
@@ -71,26 +71,10 @@ class Media:
             else:
                 logging.debug("cache file not found")
         if not stdout:
-            try:
-                command = " ".join(args)
-                if cache_key:
-                    logging.info(f"\nBuilding cached output: {command}")
-                logging.debug(f"\n+ BEGIN calling {command}")
-                cp = subprocess.run(
-                    args, check=True, capture_output=True, universal_newlines=True
-                )
-                stdout = cp.stdout
-                logging.debug(f"\n+ END calling {command}")
-            except subprocess.CalledProcessError as e:
-                msg = [
-                    "Error calling process:",
-                    f"return_code: {e.returncode}",
-                    f"stdout:\n{e.stdout}",
-                    f"stderr:\n{e.stderr}",
-                ]
-                logging.error("\n".join(msg))
-                raise
-
+            command = " ".join(args)
+            if cache_key:
+                logging.info(f"\nBuilding cached output: {command}")
+            stdout = run_process(args)
             if cache_key:
                 with open(cache_file, mode="w") as fh:
                     fh.write(stdout)

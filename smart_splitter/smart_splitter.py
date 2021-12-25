@@ -2,96 +2,83 @@ import logging
 import os
 import re
 from functools import partial
+from typing import Optional
 
-from core import utils
 from core.tool import Tool
 from smart_splitter.media import Media
 from decimal import Decimal
 from smart_splitter.config import SmartSplitterConfig
-from core.utils import mime_type
+from core.utils import validate_paths, log_file_header
 
 
 class SmartSplitter(Tool):
     def __init__(self, parsed_args):
+        super().__init__(parsed_args)
         self.config = SmartSplitterConfig(parsed_args.config)
         self.config.load_from_parsed_args(parsed_args)
-        self.config.validate()
-        self.input = os.path.realpath(parsed_args.input)
+        self.validate()
         if not os.path.exists(self.input):
             raise FileNotFoundError(self.input)
 
     def run(self):
-        if os.path.isdir(self.input):
-            media_files = self.find_media_files()
-            if not media_files:
-                logging.warning("no media files found in input directory")
-            return
-        else:
-            media_type = mime_type(self.input)
-            if not utils.is_video_file(media_type):
-                raise ValueError(f"{self.input} is not a video file!")
-            media_files = [self.input]
+        media_files = self.build_media_files()
         self.split_files(media_files)
 
-    def find_media_files(self) -> list[str]:
-        logging.debug(f"finding media files in {self.input}")
-        media_files = []
-        for entry in os.listdir(self.input):
-            full_path = os.path.join(self.input, entry)
-            if os.path.isdir(entry):
-                logging.debug(f"skipping directory {full_path}")
-                continue
-            media_type = mime_type(full_path)
-            if not utils.is_video_file(media_type):
-                logging.debug(f"skipping non-video file: {full_path} [{media_type}]")
-                continue
-            media_files.append(full_path)
-        return media_files
+    def output_folder(self, media_file: str, create: bool = True) -> Optional[str]:
+        if not self.config.output_directory:
+            self.config.output_directory = os.path.dirname(media_file)
+        basename = os.path.basename(media_file)
+        if not self.config.input_pattern:
+            output_folder = os.path.splitext(basename)[0]
+        elif match := self.config.input_pattern.match(basename):
+            output_folder = "_".join(match.groups())
+        else:
+            logging.warning(
+                f"input pattern was specified, but no match was found. skipping..."
+            )
+            output_folder = None
+        if create and output_folder:
+            output_path = os.path.join(self.config.output_directory, output_folder)
+            os.makedirs(output_path, exist_ok=True)
+        return output_folder
+
+    def check_media_id(self, output_path: str, media_id: str):
+        media_id_file = os.path.join(output_path, ".media")
+        if os.path.exists(media_id_file):
+            with open(media_id_file) as fh:
+                file_media_id = fh.read()
+            if file_media_id != media_id:
+                raise ValueError(
+                    f"'{output_path}' contains output for '{file_media_id}'"
+                )
+        else:
+            if os.listdir(output_path):
+                logging.warning(
+                    f"{output_path} missing .media file, but contains files."
+                )
+            with open(media_id_file, "w") as fh:
+                fh.write(media_id)
+
+    def split_media(self, media_file: str):
+        log_file_header(media_file)
+        output_folder = self.output_folder(media_file)
+        if not output_folder:
+            return
+        output_path = os.path.join(self.config.output_directory, output_folder)
+        self.check_media_id(output_path)
+        logging.info(f"\nOUTPUT: {output_path}")
+        media = Media(
+            media_file,
+            output_path,
+            self.config,
+        )
+        media.split()
 
     def split_files(self, media_files: list[str]):
         for media_file in media_files:
-            if not self.config.output_directory:
-                self.config.output_directory = os.path.dirname(media_file)
             old_handlers = logging.getLogger().handlers[:]
-            basename = os.path.basename(media_file)
             try:
-                line = "*" * (len(basename) + 4)
-                logging.info(f"\n{line}\n* {basename} *\n{line}")
-                if not self.config.input_pattern:
-                    output_folder = os.path.splitext(basename)[0]
-                elif match := self.config.input_pattern.match(basename):
-                    output_folder = "_".join(match.groups())
-                else:
-                    logging.warning(
-                        f"input pattern was specified, but no match was found. skipping..."
-                    )
-                    continue
-                output_folder = os.path.join(
-                    self.config.output_directory, output_folder
-                )
-                os.makedirs(output_folder, exist_ok=True)
-                media_id_file = os.path.join(output_folder, ".media")
-                if os.path.exists(media_id_file):
-                    with open(media_id_file) as fh:
-                        media_id_file_path = fh.read()
-                    if media_id_file_path != basename:
-                        raise ValueError(
-                            f"'{output_folder}' contains output for '{media_id_file_path}'"
-                        )
-                else:
-                    if os.listdir(output_folder):
-                        logging.warning(
-                            f"{output_folder} missing .media file, but contains files."
-                        )
-                    with open(media_id_file, "w") as fh:
-                        fh.write(basename)
-                logging.info(f"\nOUTPUT: {output_folder}")
-                media = Media(
-                    media_file,
-                    output_folder,
-                    self.config,
-                )
-                media.split()
+                self.split_media(media_file)
             except Exception as exc:
                 # catch errors here, so we can continue with the remaining files
                 if isinstance(Exception, FileNotFoundError):
@@ -106,6 +93,19 @@ class SmartSplitter(Tool):
                 ]
                 for handler in remove_handlers:
                     logging.getLogger().removeHandler(handler)
+
+    def validate(self):
+        validate_paths(
+            self.config.ffmpeg,
+            self.config.ffprobe,
+            self.config.handbrake_cli,
+            self.config.handbrake_presets_import,
+        )
+        with open(self.config.handbrake_presets_import) as fh:
+            if self.config.handbrake_preset not in fh.read():
+                raise ValueError(
+                    f"handbrake preset not found: {self.config.handbrake_preset}"
+                )
 
     @staticmethod
     def create_parser(subparsers):
