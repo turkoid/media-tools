@@ -18,6 +18,7 @@ class SmartSplitterConfig(Config):
         self._silencedetect_options: Optional[str] = None
         self.output_directory: Optional[str] = None
         self.input_pattern: Optional[Pattern] = None
+        self.dry_run: bool = False
         self.attrs: dict[str, ConfigAttr] = SmartSplitterConfig._create_config_entries()
         self._load_from_config()
 
@@ -32,6 +33,7 @@ class SmartSplitterConfig(Config):
             ConfigAttr("_blackdetect_options", "silencedetect_options"),
             ConfigAttr("output_directory"),
             ConfigAttr("input_pattern", type=Pattern),
+            ConfigAttr("dry_run", type=bool),
         ]
         return {attr.name: attr for attr in attrs}
 
@@ -39,7 +41,7 @@ class SmartSplitterConfig(Config):
         if value is not None and attr.type and not isinstance(value, attr.type):
             if attr.type is Pattern:
                 value = re.compile(value, re.IGNORECASE)
-            else:
+            elif not isinstance(value, attr.type):
                 value = attr.type(value)
         logging.debug(f"setting {attr.name}={value}")
         setattr(self, attr.name, value)

@@ -11,6 +11,7 @@ from stream_pruner.models import SubtitleTrack, MkvData, AudioTrack, VideoTrack
 class StreamPruner(Tool):
     def __init__(self, parsed_args):
         super().__init__(parsed_args)
+        self.dry_run = parsed_args.dry_run
         self.config = Config(parsed_args.config)
         self.input = os.path.abspath(parsed_args.input)
         if os.path.isdir(self.input):
@@ -121,7 +122,14 @@ class StreamPruner(Tool):
             ]
         )
         args.append(media_file)
-        run_process(args)
+        if self.dry_run:
+            command = " ".join(args)
+            logging.debug(f"running command={command}")
+            logging.info(f"dry run: pruning...")
+        else:
+            logging.info("pruning...")
+            run_process(args)
+            logging.info("...done!")
 
     def prune_files(self, media_files: list[str]):
         for media_file in media_files:
@@ -150,4 +158,10 @@ class StreamPruner(Tool):
             "--output-directory",
             "-o",
             help="directory to store pruned files (defaults to path relative to input file/directory)",
+        )
+        parser.add_argument(
+            "--dry-run",
+            "-t",
+            action="store_true",
+            help="analyzes media, without pruning",
         )

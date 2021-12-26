@@ -59,7 +59,8 @@ class Media:
         return cache_dir
 
     def run_process(self, args: list[str], cache_key: Optional[str] = None) -> str:
-        logging.debug(f"running {args}")
+        command = " ".join(args)
+        logging.debug(f"running {command}")
         stdout = None
         cache_file = os.path.join(self.cache_directory, f"{cache_key}.txt")
         if cache_key:
@@ -72,7 +73,6 @@ class Media:
             else:
                 logging.debug("cache file not found")
         if not stdout:
-            command = " ".join(args)
             if cache_key:
                 logging.info(f"\nBuilding cached output: {command}")
             stdout = run_process(args)
@@ -354,9 +354,12 @@ class Media:
                 "-o",
                 incomplete_clip_path,
             ]
-            self.run_process(args)
-            logging.debug(
-                f"renaming {os.path.basename(incomplete_clip_path)} -> {clip_file}"
-            )
-            os.rename(incomplete_clip_path, clip_path)
-            logging.info("...done!")
+            if self.config.dry_run:
+                logging.info("...dry run")
+            else:
+                self.run_process(args)
+                logging.debug(
+                    f"renaming {os.path.basename(incomplete_clip_path)} -> {clip_file}"
+                )
+                os.rename(incomplete_clip_path, clip_path)
+                logging.info("...done!")

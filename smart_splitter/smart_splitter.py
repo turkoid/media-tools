@@ -154,3 +154,9 @@ class SmartSplitter(Tool):
             type=partial(re.compile, flags=re.IGNORECASE),
             help="regex used on the input file(s) to determine output directory relative to --output-directory (defaults to basename without extension)",
         )
+        parser.add_argument(
+            "--dry-run",
+            "-t",
+            action="store_true",
+            help="caches output, but does not run handbrake",
+        )
