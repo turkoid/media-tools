@@ -2,7 +2,7 @@ import logging
 import os
 from abc import ABC, abstractmethod
 
-from core.utils import mime_type, is_video_file
+from core.utils import mime_type, is_video_mime_type
 
 
 class Tool(ABC):
@@ -26,7 +26,7 @@ class Tool(ABC):
                 logging.warning("no media files found in input directory")
         else:
             media_type = mime_type(self.input)
-            if not is_video_file(media_type):
+            if not is_video_mime_type(media_type):
                 raise ValueError(f"{self.input} is not a video file!")
             media_files = [self.input]
         return media_files
@@ -40,7 +40,7 @@ class Tool(ABC):
                 logging.debug(f"skipping directory {full_path}")
                 continue
             media_type = mime_type(full_path)
-            if not is_video_file(media_type):
+            if not is_video_mime_type(media_type):
                 logging.debug(f"skipping non-video file: {full_path} [{media_type}]")
                 continue
             media_files.append(full_path)

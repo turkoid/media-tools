@@ -61,12 +61,18 @@ def log_multiline(level, header, message):
 
 
 def mime_type(path: str) -> str:
+    if os.path.isdir(path):
+        return "directory"
     mime = magic.from_file(path, mime=True)
     return mime
 
 
-def is_video_file(mime: str) -> bool:
+def is_video_mime_type(mime: str) -> bool:
     return mime.split("/")[0] == "video"
+
+
+def is_video_file(path: str) -> bool:
+    return is_video_mime_type(mime_type(path))
 
 
 def validate_paths(*paths: str):
@@ -95,7 +101,7 @@ def run_process(args: list[str]) -> str:
         raise
 
 
-def log_file_header(media_file: str):
-    basename = os.path.basename(media_file)
+def log_file_header(header: str, level=logging.INFO):
+    basename = os.path.basename(header)
     line = "*" * (len(basename) + 4)
-    logging.info(f"\n{line}\n* {basename} *\n{line}")
+    logging.log(level, f"\n{line}\n* {basename} *\n{line}")
