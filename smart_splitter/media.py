@@ -292,13 +292,10 @@ class Media:
                         )
                         _silent_intervals.pop(i)
                         break
-            split_points_log = []
-            for i, interval in enumerate(split_points):
-                split_points_log.append(interval.output())
             log_multiline(
                 logging.INFO,
                 "split_points:",
-                f"\n-----\n".join(split_points_log),
+                f"\n-----\n".join(sp.output() for sp in split_points),
             )
             self.cache[cache_key] = split_points
         return self.cache[cache_key]
