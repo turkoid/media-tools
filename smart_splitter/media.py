@@ -25,7 +25,7 @@ from core.utils import (
 
 class Media:
     FFMPEG_FRAME_LINE = r"frame:(\d+)\s+pts:(\d+)\s+pts_time:(-?\d+\.?\d*)"
-    FFMPEG_KEY_LINE = r"(.+)\.(.+?)(?:_([^_]+?))?=(-?\d+\.?\d*)"
+    FFMPEG_KEY_LINE = r"(?:([^.]+?)\.)?(.+?)(?:_([^_]+?))?=(.+)"
 
     def __init__(self, path: str, output_folder: str, config: SmartSplitterConfig):
         self.path: str = os.path.abspath(path)
