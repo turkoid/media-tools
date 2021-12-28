@@ -267,10 +267,10 @@ class Media:
         return self.intervals("silent_intervals", self.silent_frames)
 
     @property
-    def split_intervals(self) -> list[SplitMetadata]:
-        cache_key = "split_frames"
+    def split_points(self) -> list[SplitMetadata]:
+        cache_key = "split_points"
         if cache_key not in self.cache:
-            split_frames = []
+            split_points = []
             _black_intervals = self.black_intervals[:]
             _silent_intervals = self.silent_intervals[:]
             log_multiline(
@@ -287,67 +287,53 @@ class Media:
                 black_interval = _black_intervals.pop(0)
                 for i, silent_interval in enumerate(_silent_intervals):
                     if black_interval.overlaps(silent_interval):
-                        split_frames.append(
+                        split_points.append(
                             SplitMetadata(black_interval, silent_interval)
                         )
                         _silent_intervals.pop(i)
                         break
-            if split_frames:
-                if split_frames[0].black_frame.start.frame == 0:
-                    # first split is already at the beginning of the video
-                    pass
-                elif split_frames[0].average_start_timestamp() < 1:
-                    # the clip would be 1 second long, so don't add
-                    pass
-                else:
-                    first_split_frame = SplitMetadata.first()
-                    split_frames.insert(0, first_split_frame)
-            split_frame_log = []
-            for i, interval in enumerate(split_frames):
-                clip_file = f"{i:0>3}{self.extension}:"
-                split_frame_log.append(clip_file)
-                split_frame_log.append(interval.output(prefix="  "))
+            split_points_log = []
+            for i, interval in enumerate(split_points):
+                split_points_log.append(interval.output())
             log_multiline(
                 logging.INFO,
-                "split_frames:",
-                f"\n".join(split_frame_log),
+                "split_points:",
+                f"\n-----\n".join(split_points_log),
             )
-            self.cache[cache_key] = split_frames
+            self.cache[cache_key] = split_points
         return self.cache[cache_key]
 
-    def clip(self, start: SplitMetadata, end: Optional[SplitMetadata]) -> Clip:
-        frame_start = start.adjusted_start_frame(self.video_fps)
-        clip_start = start.average_start_timestamp()
-        if end:
-            frame_end = end.adjusted_start_frame(self.video_fps)
-            clip_end = end.average_start_timestamp()
-        else:
-            frame_end = self.video_frame_count
-            clip_end = self.video_duration
+    def clip(
+        self, start: Optional[SplitMetadata], end: Optional[SplitMetadata]
+    ) -> Clip:
+        frame_start = start.frame(self.video_fps) if start else 0
+        clip_start = start.timestamp() if start else Decimal("0")
+        frame_end = end.frame(self.video_fps) if end else self.video_frame_count
+        clip_end = end.timestamp() if end else self.video_duration
         return Clip(frame_start, frame_end, clip_start, clip_end)
 
     def split(self):
-        index = 0
-        intervals = [*self.split_intervals, None]
-        while index < len(intervals) - 1:
-            clip = self.clip(*intervals[index : index + 2])
-            clip_file = f"{index:0>3}{self.extension}"
+        split_points = [None, *self.split_points, None]
+        clip_index = 0
+        for index in range(len(split_points) - 1):
+            start, end = split_points[index : index + 2]
+            clip = self.clip(start, end)
+            if not start or not end and clip.duration < 3:
+                logging.debug(f"{clip} duration < 3 seconds. skipping...>")
+                continue
+            clip_file = f"{clip_index:0>3}{self.extension}"
             clip_path = os.path.join(self.output_folder, clip_file)
             incomplete_clip_path = f"{clip_path}.incomplete"
+            clip_index += 1
             logging.info(
                 f"Encoding {clip.frames} frames ({clip.frame_start}-{clip.frame_end}) -> {clip_file} [{format_timestamp(clip.duration)}]"
             )
-            index += 1
             if os.path.exists(clip_path):
                 logging.warning(f"{clip_file} already exists. skipping...")
                 continue
             if os.path.exists(incomplete_clip_path):
                 logging.debug(f"removing incomplete: {incomplete_clip_path}")
                 os.remove(incomplete_clip_path)
-            if clip.duration < self.config.min_duration:
-                logging.warning(
-                    f"{clip_file} duration ({clip.duration}) < min_duration ({self.config.min_duration})."
-                )
             args = [
                 self.config.handbrake_cli,
                 "--preset-import-file",

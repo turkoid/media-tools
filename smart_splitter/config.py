@@ -10,7 +10,6 @@ from core.config import Config, ConfigAttr
 class SmartSplitterConfig(Config):
     def __init__(self, config_path: str):
         super().__init__(config_path)
-        self.min_duration: Decimal = Decimal("3.0")
         self.black_min_duration: Decimal = Decimal("0.5")
         self.silence_min_duration: Decimal = Decimal("0.5")
         self.silence_noise_tolerance: Decimal = Decimal("-60")
@@ -25,7 +24,6 @@ class SmartSplitterConfig(Config):
     @staticmethod
     def _create_config_entries() -> dict[str, ConfigAttr]:
         attrs = [
-            ConfigAttr("min_duration", type=Decimal),
             ConfigAttr("black_min_duration", type=Decimal),
             ConfigAttr("silence_min_duration", type=Decimal),
             ConfigAttr("silence_noise_tolerance", type=Decimal),

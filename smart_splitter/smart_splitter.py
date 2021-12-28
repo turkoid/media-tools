@@ -115,12 +115,6 @@ class SmartSplitter(Tool):
             "split", description="split media files at black/silent frames"
         )
         parser.add_argument(
-            "--min-duration",
-            type=Decimal,
-            default="3.0",
-            help="minimum duration (secs) of output files (default: %(default)s)",
-        )
-        parser.add_argument(
             "--black-min-duration",
             type=Decimal,
             default="0.5",

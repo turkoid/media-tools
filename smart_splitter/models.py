@@ -24,12 +24,6 @@ class FrameMetadata:
     def __repr__(self):
         return str(self)
 
-    @staticmethod
-    def first(
-        filter: str, type: str, sub_type: Optional[str] = None
-    ) -> "FrameMetadata":
-        return FrameMetadata("", filter, type, sub_type, "0")
-
 
 @dataclass
 class FrameInfo:
@@ -57,10 +51,6 @@ class FrameInfo:
 
     def __repr__(self):
         return str(self)
-
-    @staticmethod
-    def first() -> "FrameInfo":
-        return FrameInfo("", 0, 0, Decimal(0))
 
 
 @dataclass
@@ -101,12 +91,6 @@ class DetectMetadata:
 
     def __repr__(self):
         return str(self)
-
-    @staticmethod
-    def first(filter: str, type: str, sub_type: str) -> "DetectMetadata":
-        first_frame = FrameInfo.first()
-        first_frame_metadata = FrameMetadata.first(filter, type, sub_type)
-        return DetectMetadata(first_frame, first_frame_metadata)
 
 
 @dataclass
@@ -159,12 +143,6 @@ class DetectInterval:
     def __repr__(self):
         return str(self)
 
-    @staticmethod
-    def first(filter: str, type: str) -> "DetectInterval":
-        start = DetectMetadata.first(filter, type, "start")
-        end = DetectMetadata.first(filter, type, "end")
-        return DetectInterval(start, end)
-
 
 @dataclass
 class SplitMetadata:
@@ -177,12 +155,12 @@ class SplitMetadata:
     def adjusted_silent_end_frame(self, video_fps: Decimal) -> int:
         return fps_adjusted_frame(self.silent_frame.end.timestamp, video_fps)
 
-    def adjusted_start_frame(self, video_fps: Decimal) -> int:
+    def frame(self, video_fps: Decimal) -> int:
         start_frame = self.adjusted_silent_start_frame(video_fps)
         end_frame = self.adjusted_silent_end_frame(video_fps)
         return int((start_frame + end_frame) / 2)
 
-    def average_start_timestamp(self) -> Decimal:
+    def timestamp(self) -> Decimal:
         return (self.silent_frame.start.timestamp + self.silent_frame.end.timestamp) / 2
 
     def output(self, video_fps: Optional[Decimal] = None, prefix=""):
@@ -193,12 +171,6 @@ class SplitMetadata:
 
     def __str__(self):
         return self.output()
-
-    @staticmethod
-    def first():
-        black_frame = DetectInterval.first("lavfi", "black")
-        silent_frame = DetectInterval.first("lavfi", "silence")
-        return SplitMetadata(black_frame, silent_frame)
 
 
 @dataclass
@@ -215,3 +187,6 @@ class Clip:
     @property
     def duration(self):
         return self.time_end - self.time_start
+
+    def __str__(self):
+        return f"{self.frame_start}-{self.frame_end} ({self.frames}) [{format_timestamp(self.duration)}]"
