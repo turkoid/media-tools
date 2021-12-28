@@ -303,21 +303,45 @@ class Media:
     def clip(
         self, start: Optional[SplitMetadata], end: Optional[SplitMetadata]
     ) -> Clip:
-        frame_start = start.frame(self.video_fps) if start else 0
-        clip_start = start.timestamp() if start else Decimal("0")
-        frame_end = end.frame(self.video_fps) if end else self.video_frame_count
-        clip_end = end.timestamp() if end else self.video_duration
+        fps = self.video_fps
+        frame_start = start.frame(fps) if start else 0
+        clip_start = start.time() if start else Decimal(0)
+        frame_end = end.frame(fps) if end else self.video_frame_count
+        clip_end = end.time() if end else self.video_duration
         return Clip(frame_start, frame_end, clip_start, clip_end)
 
-    def split(self):
-        split_points = [None, *self.split_points, None]
-        clip_index = 0
+    def clips(self) -> list[Clip]:
+        min_duration = 3
+        split_points = []
+        if self.split_points:
+            first = self.split_points[0]
+            clip_duration = first.time_start()
+            if clip_duration >= min_duration:
+                logging.debug(
+                    f"adding split point at the beginning of the video, duration={format_timestamp(clip_duration)}"
+                )
+                split_points.append(None)
+            split_points.extend(self.split_points)
+            last = self.split_points[-1]
+            clip_duration = self.video_duration - last.time_end()
+            if clip_duration >= min_duration:
+                logging.debug(
+                    f"adding split point at the end of the video, duration={format_timestamp(clip_duration)}"
+                )
+                split_points.append(None)
+        if len(split_points) <= 1:
+            logging.debug(f"clipping whole video")
+            split_points = [None, None]
+        clips = []
         for index in range(len(split_points) - 1):
             start, end = split_points[index : index + 2]
             clip = self.clip(start, end)
-            if not start or not end and clip.duration < 3:
-                logging.debug(f"{clip} duration < 3 seconds. skipping...>")
-                continue
+            clips.append(clip)
+        return clips
+
+    def split(self):
+        clips = self.clips()
+        for clip_index, clip in enumerate(clips):
             clip_file = f"{clip_index:0>3}{self.extension}"
             clip_path = os.path.join(self.output_folder, clip_file)
             incomplete_clip_path = f"{clip_path}.incomplete"
@@ -331,6 +355,10 @@ class Media:
             if os.path.exists(incomplete_clip_path):
                 logging.debug(f"removing incomplete: {incomplete_clip_path}")
                 os.remove(incomplete_clip_path)
+            if len(clips) == 1:
+                logging.info(f"clip is whole file, creating link...")
+                os.link(self.path, clip_path)
+                continue
             args = [
                 self.config.handbrake_cli,
                 "--preset-import-file",

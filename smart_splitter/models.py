@@ -149,24 +149,30 @@ class SplitMetadata:
     black_frame: DetectInterval
     silent_frame: DetectInterval
 
-    def adjusted_silent_start_frame(self, video_fps: Decimal) -> int:
+    def frame_start(self, video_fps: Decimal) -> int:
         return fps_adjusted_frame(self.silent_frame.start.timestamp, video_fps)
 
-    def adjusted_silent_end_frame(self, video_fps: Decimal) -> int:
+    def frame_end(self, video_fps: Decimal) -> int:
         return fps_adjusted_frame(self.silent_frame.end.timestamp, video_fps)
 
     def frame(self, video_fps: Decimal) -> int:
-        start_frame = self.adjusted_silent_start_frame(video_fps)
-        end_frame = self.adjusted_silent_end_frame(video_fps)
+        start_frame = self.frame_start(video_fps)
+        end_frame = self.frame_end(video_fps)
         return int((start_frame + end_frame) / 2)
 
-    def timestamp(self) -> Decimal:
-        return (self.silent_frame.start.timestamp + self.silent_frame.end.timestamp) / 2
+    def time_start(self) -> Decimal:
+        return self.silent_frame.start.timestamp
+
+    def time_end(self) -> Decimal:
+        return self.silent_frame.end.timestamp
+
+    def time(self) -> Decimal:
+        return (self.time_start() + self.time_end()) / 2
 
     def output(self, video_fps: Optional[Decimal] = None, prefix=""):
         video_fps = video_fps or self.black_frame.fps
-        start_frame = self.adjusted_silent_start_frame(video_fps)
-        end_frame = self.adjusted_silent_end_frame(video_fps)
+        start_frame = self.frame_start(video_fps)
+        end_frame = self.frame_end(video_fps)
         return f"{prefix}{self.black_frame}\n{prefix}{self.silent_frame} ({start_frame}-{end_frame})"
 
     def __str__(self):
