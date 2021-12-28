@@ -24,6 +24,12 @@ class FrameMetadata:
     def __repr__(self):
         return str(self)
 
+    @staticmethod
+    def first(
+        filter: str, type: str, sub_type: Optional[str] = None
+    ) -> "FrameMetadata":
+        return FrameMetadata("", filter, type, sub_type, "0")
+
 
 @dataclass
 class FrameInfo:
@@ -51,6 +57,10 @@ class FrameInfo:
 
     def __repr__(self):
         return str(self)
+
+    @staticmethod
+    def first() -> "FrameInfo":
+        return FrameInfo("", 0, 0, Decimal(0))
 
 
 @dataclass
@@ -92,6 +102,12 @@ class DetectMetadata:
     def __repr__(self):
         return str(self)
 
+    @staticmethod
+    def first(filter: str, type: str, sub_type: str) -> "DetectMetadata":
+        first_frame = FrameInfo.first()
+        first_frame_metadata = FrameMetadata.first(filter, type, sub_type)
+        return DetectMetadata(first_frame, first_frame_metadata)
+
 
 @dataclass
 class DetectInterval:
@@ -128,6 +144,10 @@ class DetectInterval:
     def fps(self) -> Decimal:
         return (self.start.fps + self.end.fps) / 2
 
+    @property
+    def duration(self):
+        return self.end.timestamp - self.start.timestamp
+
     def output(self, include_types: bool = True, include_frames: bool = True):
         type_part = f"[{self.type}] " if include_types else ""
         frame_part = f" | {self.frames}" if include_frames else ""
@@ -138,6 +158,12 @@ class DetectInterval:
 
     def __repr__(self):
         return str(self)
+
+    @staticmethod
+    def first(filter: str, type: str) -> "DetectInterval":
+        start = DetectMetadata.first(filter, type, "start")
+        end = DetectMetadata.first(filter, type, "end")
+        return DetectInterval(start, end)
 
 
 @dataclass
@@ -167,6 +193,12 @@ class SplitMetadata:
 
     def __str__(self):
         return self.output()
+
+    @staticmethod
+    def first():
+        black_frame = DetectInterval.first("lavfi", "black")
+        silent_frame = DetectInterval.first("lavfi", "silence")
+        return SplitMetadata(black_frame, silent_frame)
 
 
 @dataclass

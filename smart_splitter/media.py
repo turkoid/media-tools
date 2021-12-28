@@ -292,6 +292,16 @@ class Media:
                         )
                         _silent_intervals.pop(i)
                         break
+            if split_frames:
+                if split_frames[0].black_frame.start.frame == 0:
+                    # first split is already at the beginning of the video
+                    pass
+                elif split_frames[0].average_start_timestamp() < 1:
+                    # the clip would be 1 second long, so don't add
+                    pass
+                else:
+                    first_split_frame = SplitMetadata.first()
+                    split_frames.insert(0, first_split_frame)
             split_frame_log = []
             for i, interval in enumerate(split_frames):
                 clip_file = f"{i:0>3}{self.extension}:"
