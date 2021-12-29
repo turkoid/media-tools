@@ -369,7 +369,7 @@ class Media:
                 "--start-at",
                 f"frames:{clip.frame_start}",
                 "--stop-at",
-                f"frames:{clip.frame_end}",
+                f"frames:{clip.frames}",
                 "-i",
                 self.path,
                 "-o",
