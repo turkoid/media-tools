@@ -72,7 +72,9 @@ def is_video_mime_type(mime: str) -> bool:
 
 
 def is_video_file(path: str) -> bool:
-    return is_video_mime_type(mime_type(path))
+    file_type = mime_type(path)
+    logging.debug(f"{path} mime type: {file_type}")
+    return is_video_mime_type(file_type)
 
 
 def validate_paths(*paths: str):
