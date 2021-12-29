@@ -5,6 +5,8 @@ import re
 from decimal import Decimal
 from typing import Any, Optional
 
+import yaml
+
 from smart_splitter.config import SmartSplitterConfig
 from smart_splitter.models import (
     FrameInfo,
@@ -339,8 +341,28 @@ class Media:
             clips.append(clip)
         return clips
 
+    def _save_info(self, info: dict[str, Clip]):
+        info_dict = {}
+        info_dict["media"] = os.path.basename(self.path)
+        for file, clip in info.items():
+            clip_info = {}
+            clip_info["frame_start"] = clip.frame_start
+            clip_info["frame_end"] = clip.frame_end
+            clip_info["frames"] = clip.frames
+            clip_info["time_start"] = str(clip.time_start)
+            clip_info["time_end"] = str(clip.time_end)
+            clip_info["duration"] = str(clip.duration)
+            clip_info["formatted"] = {}
+            clip_info["formatted"]["time_start"] = format_timestamp(clip.time_start)
+            clip_info["formatted"]["time_end"] = format_timestamp(clip.time_end)
+            clip_info["formatted"]["duration"] = format_timestamp(clip.duration)
+            info_dict[file] = clip_info
+        with open(os.path.join(self.output_folder, "info.yaml"), "w") as fh:
+            yaml.dump(info_dict, fh, sort_keys=False)
+
     def split(self):
         clips = self.clips()
+        info: dict[str, Clip] = {}
         for clip_index, clip in enumerate(clips):
             clip_file = f"{clip_index:0>3}{self.extension}"
             clip_path = os.path.join(self.output_folder, clip_file)
@@ -349,6 +371,7 @@ class Media:
             logging.info(
                 f"Encoding {clip.frames} frames ({clip.frame_start}-{clip.frame_end}) -> {clip_file} [{format_timestamp(clip.duration)}]"
             )
+            info[clip_file] = clip
             if os.path.exists(clip_path):
                 logging.warning(f"{clip_file} already exists. skipping...")
                 continue
@@ -384,3 +407,4 @@ class Media:
                 )
                 os.rename(incomplete_clip_path, clip_path)
                 logging.info("...done!")
+        self._save_info(info)

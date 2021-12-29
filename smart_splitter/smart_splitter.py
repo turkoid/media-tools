@@ -4,6 +4,8 @@ import re
 from functools import partial
 from typing import Optional
 
+import yaml
+
 from core.tool import Tool
 from smart_splitter.media import Media
 from decimal import Decimal
@@ -46,10 +48,13 @@ class SmartSplitter(Tool):
         return output_path
 
     def check_media_id(self, output_path: str, media_id: str):
-        media_id_file = os.path.join(output_path, ".media")
-        if os.path.exists(media_id_file):
-            with open(media_id_file) as fh:
-                file_media_id = fh.read()
+        info_file = os.path.join(output_path, "info.yaml")
+        if os.path.exists(info_file):
+            with open(info_file) as fh:
+                info = yaml.safe_load(fh)
+                if "media" not in info:
+                    raise KeyError(f"info.yaml file is missing the media key")
+                file_media_id = info["media"]
             if file_media_id != media_id:
                 raise ValueError(
                     f"'{output_path}' contains output for '{file_media_id}'"
@@ -57,10 +62,8 @@ class SmartSplitter(Tool):
         else:
             if os.listdir(output_path):
                 logging.warning(
-                    f"{output_path} missing .media file, but contains files."
+                    f"{output_path} missing info.yaml file, but contains files."
                 )
-            with open(media_id_file, "w") as fh:
-                fh.write(media_id)
 
     def split_media(self, media_file: str):
         log_file_header(media_file)
