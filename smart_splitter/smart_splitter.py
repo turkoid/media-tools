@@ -71,7 +71,7 @@ class SmartSplitter(Tool):
         if not output_path:
             return
         self.check_media_id(output_path, os.path.basename(media_file))
-        logging.info(f"\nOUTPUT: {output_path}")
+        logging.info(f"OUTPUT: {output_path}")
         media = Media(
             media_file,
             output_path,
