@@ -2,13 +2,15 @@ import logging
 import os
 from abc import ABC, abstractmethod
 
-from core.utils import mime_type, is_video_mime_type
+from core.utils import mimetype, is_video_mimetype, is_video_file
 
 
 class Tool(ABC):
     def __init__(self, parsed_args):
         self.parsed_args = parsed_args
         self.input: str = parsed_args.input
+        self.dry_run: bool = parsed_args.dry_run
+        self.strict_mimetype: bool = parsed_args.strict_mimetype
 
     @abstractmethod
     def run(self):
@@ -24,24 +26,22 @@ class Tool(ABC):
             media_files = self.find_media_files()
             if not media_files:
                 logging.warning("no media files found in input directory")
-        else:
-            media_type = mime_type(self.input)
-            if not is_video_mime_type(media_type):
-                raise ValueError(f"{self.input} is not a video file!")
+        elif is_video_file(self.input, self.strict_mimetype):
             media_files = [self.input]
+        else:
+            raise ValueError(f"{self.input} is not a video file!")
         return media_files
 
     def find_media_files(self) -> list[str]:
         logging.debug(f"finding media files in {self.input}")
         media_files = []
         for entry in os.listdir(self.input):
-            full_path = os.path.join(self.input, entry)
-            if os.path.isdir(full_path):
-                logging.debug(f"skipping directory {full_path}")
+            entry_path = os.path.join(self.input, entry)
+            entry_mimetype = mimetype(entry_path, self.strict_mimetype)
+            if not is_video_mimetype(entry_mimetype):
+                logging.debug(
+                    f"skipping non-video file: {entry_path} [{entry_mimetype}]"
+                )
                 continue
-            media_type = mime_type(full_path)
-            if not is_video_mime_type(media_type):
-                logging.debug(f"skipping non-video file: {full_path} [{media_type}]")
-                continue
-            media_files.append(full_path)
+            media_files.append(entry_path)
         return media_files

@@ -1,9 +1,12 @@
 import logging
+import mimetypes
 import os
 import subprocess
 import sys
 import time
 from decimal import Decimal
+from typing import Optional
+
 import magic
 
 
@@ -60,21 +63,23 @@ def log_multiline(level, header, message):
     logging.log(level, f"{header}\n{message}")
 
 
-def mime_type(path: str) -> str:
+def mimetype(path: str, strict: bool = False) -> Optional[str]:
     if os.path.isdir(path):
         return "directory"
-    mime = magic.from_file(path, mime=True)
-    return mime
+    path_mimetype = (
+        magic.from_file(path, mime=True) if strict else mimetypes.guess_type(path)[0]
+    )
+    return path_mimetype
 
 
-def is_video_mime_type(mime: str) -> bool:
-    return mime.split("/")[0] == "video"
+def is_video_mimetype(path_mimetype: Optional[str]) -> bool:
+    return path_mimetype and path_mimetype.split("/")[0] == "video"
 
 
-def is_video_file(path: str) -> bool:
-    file_type = mime_type(path)
-    logging.debug(f"{path} mime type: {file_type}")
-    return is_video_mime_type(file_type)
+def is_video_file(path: str, strict: bool = False) -> bool:
+    path_mimetype = mimetype(path, strict)
+    logging.debug(f"{path} mimetype: {path_mimetype}")
+    return is_video_mimetype(path_mimetype)
 
 
 def validate_paths(*paths: str):

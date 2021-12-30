@@ -159,9 +159,3 @@ class StreamPruner(Tool):
             "-o",
             help="directory to store pruned files (defaults to path relative to input file/directory)",
         )
-        parser.add_argument(
-            "--dry-run",
-            "-t",
-            action="store_true",
-            help="analyzes media, without pruning",
-        )

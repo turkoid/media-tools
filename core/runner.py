@@ -14,6 +14,16 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--debug", action="store_true", help="prints stack traces to stdout if enabled"
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="runs the tool without making modifications",
+    )
+    parser.add_argument(
+        "--strict-mimetype",
+        action="store_true",
+        help="if passed, detect the mimetype from the file instead of the extension",
+    )
     subparsers = parser.add_subparsers(help="commands", dest="tool", required=True)
     for tool in [SmartSplitter, StreamPruner]:
         tool.create_parser(subparsers)
