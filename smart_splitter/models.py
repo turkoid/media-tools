@@ -153,7 +153,7 @@ class SplitMetadata:
         return fps_adjusted_frame(self.silent_frame.start.timestamp, video_fps)
 
     def frame_end(self, video_fps: Decimal) -> int:
-        return fps_adjusted_frame(self.silent_frame.end.timestamp, video_fps)
+        return fps_adjusted_frame(self.black_frame.end.timestamp, video_fps)
 
     def frame(self, video_fps: Decimal) -> int:
         start_frame = self.frame_start(video_fps)
@@ -164,7 +164,7 @@ class SplitMetadata:
         return self.silent_frame.start.timestamp
 
     def time_end(self) -> Decimal:
-        return self.silent_frame.end.timestamp
+        return self.black_frame.end.timestamp
 
     def time(self) -> Decimal:
         return (self.time_start() + self.time_end()) / 2
