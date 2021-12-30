@@ -295,7 +295,7 @@ class Media:
                         _silent_intervals.pop(i)
                         break
             log_multiline(
-                logging.INFO,
+                logging.DEBUG,
                 "split_points:",
                 f"\n-----\n".join(sp.output() for sp in split_points),
             )
