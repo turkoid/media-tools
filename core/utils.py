@@ -120,6 +120,7 @@ async def async_run_process(
             stderr = normalize_newlines(stderr)
         if check and process.returncode:
             raise CalledProcessError(process.returncode, args, stdout, stderr)
+        logging.debug(normalize_newlines(stdout))
         return CompletedProcess(args, process.returncode, stdout, stderr)
     except Exception:
         process.kill()
