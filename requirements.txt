@@ -1,2 +1,4 @@
 PyYAML
 python-magic-bin
+asyncio
+tqdm

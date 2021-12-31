@@ -1,10 +1,14 @@
+import asyncio
 import json
 import logging
 import os
 import re
 from decimal import Decimal
+from functools import partial
+from subprocess import CompletedProcess
 from typing import Any, Optional
 
+from tqdm import tqdm
 import yaml
 
 from smart_splitter.config import SmartSplitterConfig
@@ -22,7 +26,10 @@ from core.utils import (
     parse_timestamp,
     format_timestamp,
     run_process,
+    async_run_process,
 )
+
+ENC_START = b"Encoding: task 1 of 1, "
 
 
 class Media:
@@ -360,6 +367,39 @@ class Media:
         with open(os.path.join(self.output_folder, "info.yaml"), "w") as fh:
             yaml.dump(info_dict, fh, sort_keys=False)
 
+    async def _monitor_encoding(
+        self, stream: asyncio.StreamReader, progress_bar: tqdm
+    ) -> bytes:
+        output = []
+        current_line = b""
+        while buffer := await stream.read(2 ** 16):
+            output.append(buffer)
+            current_line += buffer
+            if (perc_index := current_line.find(b"%")) != 1 and (
+                enc_start := current_line.rfind(ENC_START, 0, perc_index)
+            ) != -1:
+                perc = current_line[enc_start + len(ENC_START) : perc_index]
+                current_line = current_line[perc_index + 1 :]
+                if perc:
+                    progress_bar.update(float(perc) - progress_bar.n)
+        output.append(current_line)
+        return b"".join(output)
+
+    def _split(self, args: list[str]):
+        with tqdm(
+            total=100,
+            desc="Encoding",
+            miniters=1,
+            delay=1,
+            bar_format="{l_bar}{bar:20}| [{elapsed}] ETA: {remaining}",
+        ) as pbar:
+            monitor_task = partial(self._monitor_encoding, progress_bar=pbar)
+            cp: CompletedProcess = asyncio.run(
+                async_run_process(args, stdout_task=monitor_task, check=True, text=True)
+            )
+            if cp.returncode == 0:
+                pbar.update(100 - pbar.n)
+
     def split(self):
         clips = self.clips()
         info: dict[str, Clip] = {}
@@ -401,7 +441,7 @@ class Media:
             if self.config.dry_run:
                 logging.info("...dry run")
             else:
-                self.run_process(args)
+                self._split(args)
                 logging.debug(
                     f"renaming {os.path.basename(incomplete_clip_path)} -> {clip_file}"
                 )

@@ -5,9 +5,11 @@ import subprocess
 import sys
 import time
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Callable, Union
 
+import asyncio
 import magic
+from subprocess import CompletedProcess, CalledProcessError
 
 
 def initialize_logger(debug_file_path: str, debug_mode: bool = False):
@@ -88,13 +90,47 @@ def validate_paths(*paths: str):
             raise FileNotFoundError(path)
 
 
+def normalize_newlines(data: Union[bytes, str]) -> str:
+    if isinstance(data, bytes):
+        data = data.decode()
+    return data.replace("\r\n", "\n").replace("\r", "\n")
+
+
+RunTask = Callable[[asyncio.StreamReader], bytes]
+
+
+async def async_run_process(
+    args,
+    stdout_task: Optional[RunTask] = None,
+    stderr_task: Optional[RunTask] = None,
+    check: bool = False,
+    text: bool = False,
+) -> CompletedProcess:
+    process = await asyncio.create_subprocess_exec(
+        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    try:
+        stdout, stderr = await asyncio.gather(
+            stdout_task(process.stdout) if stdout_task else process.stdout.read(),
+            stderr_task(process.stderr) if stderr_task else process.stderr.read(),
+        )
+        await process.wait()
+        if text:
+            stdout = normalize_newlines(stdout)
+            stderr = normalize_newlines(stderr)
+        if check and process.returncode:
+            raise CalledProcessError(process.returncode, args, stdout, stderr)
+        return CompletedProcess(args, process.returncode, stdout, stderr)
+    except Exception:
+        process.kill()
+        raise
+
+
 def run_process(args: list[str]) -> str:
     try:
         command = " ".join(args)
         logging.debug(f"\n+ BEGIN calling {command}")
-        cp = subprocess.run(
-            args, check=True, capture_output=True, universal_newlines=True
-        )
+        cp = asyncio.run(async_run_process(args, check=True, text=True))
         logging.debug(f"\n+ END calling {command}")
         return cp.stdout
     except subprocess.CalledProcessError as e:
