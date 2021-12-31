@@ -27,9 +27,8 @@ from core.utils import (
     format_timestamp,
     run_process,
     async_run_process,
+    monitor_handbrake_encode,
 )
-
-ENC_START = b"Encoding: task 1 of 1, "
 
 
 class Media:
@@ -349,10 +348,9 @@ class Media:
         return clips
 
     def _save_info(self, info: dict[str, Clip]):
-        info_dict = {}
-        info_dict["media"] = os.path.basename(self.path)
+        info_dict = {"media": os.path.basename(self.path)}
         for file, clip in info.items():
-            clip_info = {}
+            clip_info = dict()
             clip_info["frame_start"] = clip.frame_start
             clip_info["frame_end"] = clip.frame_end
             clip_info["frames"] = clip.frames
@@ -367,24 +365,6 @@ class Media:
         with open(os.path.join(self.output_folder, "info.yaml"), "w") as fh:
             yaml.dump(info_dict, fh, sort_keys=False)
 
-    async def _monitor_encoding(
-        self, stream: asyncio.StreamReader, progress_bar: tqdm
-    ) -> bytes:
-        output = []
-        current_line = b""
-        while buffer := await stream.read(2 ** 16):
-            output.append(buffer)
-            current_line += buffer
-            if (perc_index := current_line.find(b"%")) != 1 and (
-                enc_start := current_line.rfind(ENC_START, 0, perc_index)
-            ) != -1:
-                perc = current_line[enc_start + len(ENC_START) : perc_index]
-                current_line = current_line[perc_index + 1 :]
-                if perc:
-                    progress_bar.update(float(perc) - progress_bar.n)
-        output.append(current_line)
-        return b"".join(output)
-
     def _split(self, args: list[str]):
         with tqdm(
             total=100,
@@ -393,9 +373,17 @@ class Media:
             delay=1,
             bar_format="{l_bar}{bar:20}| [{elapsed}] ETA: {remaining}",
         ) as pbar:
-            monitor_task = partial(self._monitor_encoding, progress_bar=pbar)
+            monitor_callback = partial(
+                monitor_handbrake_encode, progress_bar=pbar, data={"current_line": b""}
+            )
             cp: CompletedProcess = asyncio.run(
-                async_run_process(args, stdout_task=monitor_task, check=True, text=True)
+                async_run_process(
+                    args,
+                    stdout_callback=monitor_callback,
+                    check=True,
+                    text=True,
+                    print_stdout=True,
+                )
             )
             if cp.returncode == 0:
                 pbar.update(100 - pbar.n)

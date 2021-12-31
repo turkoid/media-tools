@@ -11,6 +11,8 @@ import asyncio
 import magic
 from subprocess import CompletedProcess, CalledProcessError
 
+from tqdm import tqdm
+
 
 def initialize_logger(debug_file_path: str, debug_mode: bool = False):
     logger = logging.getLogger()
@@ -90,29 +92,65 @@ def validate_paths(*paths: str):
             raise FileNotFoundError(path)
 
 
+ENC_START = b"Encoding: task 1 of 1, "
+OutputCallback = Callable[[bytes], None]
+
+
+def monitor_handbrake_encode(buffer: bytes, progress_bar: tqdm, data: dict[str, bytes]):
+    current_line = data["current_line"] + buffer
+    if (perc_index := current_line.find(b"%")) != 1 and (
+        enc_start := current_line.rfind(ENC_START, 0, perc_index)
+    ) != -1:
+        perc = current_line[enc_start + len(ENC_START) : perc_index]
+        current_line = current_line[perc_index + 1 :]
+        if perc:
+            progress_bar.update(float(perc) - progress_bar.n)
+    data["current_line"] = current_line
+
+
+async def capture_output(
+    stream: asyncio.StreamReader, callbacks: list[OutputCallback]
+) -> bytes:
+    output = []
+    while buffer := await stream.read(2 ** 16):
+        output.append(buffer)
+        for callback in callbacks:
+            callback(buffer)
+    return b"".join(output)
+
+
 def normalize_newlines(data: Union[bytes, str]) -> str:
     if isinstance(data, bytes):
         data = data.decode()
     return data.replace("\r\n", "\n").replace("\r", "\n")
 
 
-RunTask = Callable[[asyncio.StreamReader], bytes]
-
-
 async def async_run_process(
     args,
-    stdout_task: Optional[RunTask] = None,
-    stderr_task: Optional[RunTask] = None,
+    stdout_callback: Optional[OutputCallback] = None,
+    stderr_callback: Optional[OutputCallback] = None,
     check: bool = False,
     text: bool = False,
+    print_stdout=False,
+    print_stderr=False,
 ) -> CompletedProcess:
     process = await asyncio.create_subprocess_exec(
         *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
     try:
+        stdout_callbacks = [
+            callback
+            for callback in [print_stdout and sys.stdout.buffer.write, stdout_callback]
+            if callback
+        ]
+        stderr_callbacks = [
+            callback
+            for callback in [print_stderr and sys.stderr.buffer.write, stderr_callback]
+            if callback
+        ]
         stdout, stderr = await asyncio.gather(
-            stdout_task(process.stdout) if stdout_task else process.stdout.read(),
-            stderr_task(process.stderr) if stderr_task else process.stderr.read(),
+            capture_output(process.stdout, stdout_callbacks),
+            capture_output(process.stderr, stderr_callbacks),
         )
         await process.wait()
         if text:
