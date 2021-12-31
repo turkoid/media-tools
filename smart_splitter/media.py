@@ -382,7 +382,6 @@ class Media:
                     stdout_handler=handler,
                     check=True,
                     text=True,
-                    print_stdout=True,
                 )
             )
             if cp.returncode == 0:
