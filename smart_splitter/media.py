@@ -373,13 +373,13 @@ class Media:
             delay=1,
             bar_format="{l_bar}{bar:20}| [{elapsed}] ETA: {remaining}",
         ) as pbar:
-            monitor_callback = partial(
+            handler = partial(
                 monitor_handbrake_encode, progress_bar=pbar, data={"current_line": b""}
             )
             cp: CompletedProcess = asyncio.run(
                 async_run_process(
                     args,
-                    stdout_callback=monitor_callback,
+                    stdout_handler=handler,
                     check=True,
                     text=True,
                     print_stdout=True,

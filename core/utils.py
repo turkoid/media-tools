@@ -93,7 +93,7 @@ def validate_paths(*paths: str):
 
 
 ENC_START = b"Encoding: task 1 of 1, "
-OutputCallback = Callable[[bytes], None]
+OutputHandler = Callable[[bytes], None]
 
 
 def monitor_handbrake_encode(buffer: bytes, progress_bar: tqdm, data: dict[str, bytes]):
@@ -109,13 +109,13 @@ def monitor_handbrake_encode(buffer: bytes, progress_bar: tqdm, data: dict[str, 
 
 
 async def capture_output(
-    stream: asyncio.StreamReader, callbacks: list[OutputCallback]
+    stream: asyncio.StreamReader, handlers: list[OutputHandler]
 ) -> bytes:
     output = []
     while buffer := await stream.read(2 ** 16):
         output.append(buffer)
-        for callback in callbacks:
-            callback(buffer)
+        for handler in handlers:
+            handler(buffer)
     return b"".join(output)
 
 
@@ -127,31 +127,36 @@ def normalize_newlines(data: Union[bytes, str]) -> str:
 
 async def async_run_process(
     args,
-    stdout_callback: Optional[OutputCallback] = None,
-    stderr_callback: Optional[OutputCallback] = None,
+    stdout_handler: Optional[OutputHandler] = None,
+    stderr_handler: Optional[OutputHandler] = None,
     check: bool = False,
     text: bool = False,
-    print_stdout=False,
-    print_stderr=False,
+    print_stdout: bool = False,
+    print_stderr: bool = False,
 ) -> CompletedProcess:
     process = await asyncio.create_subprocess_exec(
         *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
     try:
-        stdout_callbacks = [
-            callback
-            for callback in [print_stdout and sys.stdout.buffer.write, stdout_callback]
-            if callback
+        stdout_handlers = [
+            handler
+            for handler in [print_stdout and sys.stdout.buffer.write, stdout_handler]
+            if handler
         ]
-        stderr_callbacks = [
-            callback
-            for callback in [print_stderr and sys.stderr.buffer.write, stderr_callback]
-            if callback
+        stderr_handlers = [
+            handler
+            for handler in [print_stderr and sys.stderr.buffer.write, stderr_handler]
+            if handler
         ]
-        stdout, stderr = await asyncio.gather(
-            capture_output(process.stdout, stdout_callbacks),
-            capture_output(process.stderr, stderr_callbacks),
-        )
+        if stdout_handlers:
+            stdout_coroutine = capture_output(process.stdout, stdout_handlers)
+        else:
+            stdout_coroutine = process.stdout.read()
+        if stderr_handlers:
+            stderr_coroutine = capture_output(process.stderr, stderr_handlers)
+        else:
+            stderr_coroutine = process.stderr.read()
+        stdout, stderr = await asyncio.gather(stdout_coroutine, stderr_coroutine)
         await process.wait()
         if text:
             stdout = normalize_newlines(stdout)
