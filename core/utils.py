@@ -98,7 +98,7 @@ OutputHandler = Callable[[bytes], None]
 
 def monitor_handbrake_encode(buffer: bytes, progress_bar: tqdm, data: dict[str, bytes]):
     current_line = data["current_line"] + buffer
-    if (perc_index := current_line.find(b"%")) != 1 and (
+    if (perc_index := current_line.find(b"%")) != -1 and (
         enc_start := current_line.rfind(ENC_START, 0, perc_index)
     ) != -1:
         perc = current_line[enc_start + len(ENC_START) : perc_index]
