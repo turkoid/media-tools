@@ -1,3 +1,4 @@
+import json
 import logging
 import mimetypes
 import os
@@ -192,3 +193,16 @@ def log_file_header(header: str, level=logging.INFO):
     basename = os.path.basename(header)
     line = "*" * (len(basename) + 4)
     logging.log(level, f"\n{line}\n* {basename} *\n{line}")
+
+
+def identify(mkvmerge_path: str, path: str) -> dict:
+    args = [
+        mkvmerge_path,
+        "--identify",
+        "--identification-format",
+        "json",
+        path,
+    ]
+    stdout = run_process(args)
+    json_dict = json.loads(stdout)
+    return json_dict
