@@ -126,19 +126,6 @@ class StreamPruner(Tool):
             if track.id in new_track_order:
                 continue
             logging.info(f"---{track.short_type} {track}")
-        # for track in old_tracks:
-        #     move = " "
-        #     if track.id in new_track_order:
-        #         old_index = old_track_order[track.id]
-        #         new_index = new_track_order[track.id]
-        #         op = "++"
-        #         if new_index < old_index:
-        #             move = "↑"
-        #         elif new_index > old_index:
-        #             move = "↓"
-        #     else:
-        #         op = "--"
-        #     logging.info(f"{op}{move}{track.short_type} {track}")
         if len(new_tracks) == len(old_tracks) and list(new_track_order.keys()) == list(
             old_track_order.keys()
         ):
