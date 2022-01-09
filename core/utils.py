@@ -26,7 +26,7 @@ def initialize_logger(debug_file_path: str, debug_mode: bool = False):
         sh.addFilter(lambda record: 0 if record.exc_info else 1)
     init_logging_handler(sh, logging.INFO)
     logger.addHandler(sh)
-    fh = logging.FileHandler(filename=debug_file_path, mode="w")
+    fh = logging.FileHandler(filename=debug_file_path, mode="w", encoding="utf-8")
     init_logging_handler(fh)
     logger.addHandler(fh)
 
