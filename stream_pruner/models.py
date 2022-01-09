@@ -13,7 +13,7 @@ class Track:
         self.forced_prop: bool = self.properties.get("forced_track", False)
         self.language: str = self.properties.get("language", "und")
         self.track_name: str = self.properties.get("track_name", "")
-        self.short_type, self.codec = self.properties.get("codec_id", "?-").split("-")
+        self.short_type, self.codec = self.properties.get("codec_id", "?-").split("_")
 
     @property
     def forced(self) -> bool:
@@ -23,8 +23,8 @@ class Track:
         return undefined_lang if self.language == "und" else self.language
 
     def __str__(self):
-        track_name = self.track_name or "<und>"
-        return f"[{self.id}][{self.codec}].{self.language}: {track_name}"
+        track_name = f" - {self.track_name}" if self.track_name else ""
+        return f"{self.id}:[{self.codec}].{self.language}{track_name}"
 
     def __repr__(self):
         return str(self)

@@ -21,9 +21,11 @@ class StreamPruner(Tool):
             self.input_directory = self.input
         else:
             self.input_directory = os.path.dirname(self.input)
-        self.video_lang_codes = self._normalize_lang_codes(parsed_args.video_lang)
-        self.audio_lang_codes = self._normalize_lang_codes(parsed_args.audio_lang)
-        self.subtitle_lang_codes = self._normalize_lang_codes(parsed_args.subtitle_lang)
+        self.video_lang_codes = self._normalize_lang_codes(parsed_args.video_lang or [])
+        self.audio_lang_codes = self._normalize_lang_codes(parsed_args.audio_lang or [])
+        self.subtitle_lang_codes = self._normalize_lang_codes(
+            parsed_args.subtitle_lang or []
+        )
         self.prefer_text_subtitles: bool = parsed_args.prefer_text_subtitles
         self.prefer_sdh_subtitles: bool = parsed_args.prefer_sdh_subtitles
         self.undefined_lang: str = parsed_args.undefined_lang.lower() or "und"
@@ -39,7 +41,7 @@ class StreamPruner(Tool):
 
     def validate(self):
         validate_paths(self.config.mkvmerge, self.input)
-        if os.path.samefile(self.input_directory, self.output_path):
+        if os.path.realpath(self.input_directory) == os.path.realpath(self.output_path):
             raise ValueError(
                 "output directory must be different then the input directory"
             )
@@ -106,25 +108,38 @@ class StreamPruner(Tool):
     def _output_track_operations(
         self, old_tracks: list[Track], new_tracks: list[Track]
     ):
-        new_track_order = {t.id: (i, t) for i, t in enumerate(new_tracks)}
+        new_track_order = {t.id: i for i, t in enumerate(new_tracks)}
         old_track_order = {
-            t.id: (i, t)
-            for i, t in enumerate(t for t in old_tracks if t.id in new_track_order)
+            t.id: i
+            for i, t in enumerate(ot for ot in old_tracks if ot.id in new_track_order)
         }
-
-        for track_id, (old_index, track) in old_track_order.items():
-            move = " "
-            if track_id in new_track_order:
-                new_index, new_track = new_track_order[track_id]
-                op = "++"
-                if new_index > old_index:
-                    move = "↑"
-                elif new_index < old_index:
-                    move = "↓"
+        for new_index, track in enumerate(new_tracks):
+            old_index = old_track_order[track.id]
+            if new_index < old_index:
+                move = "↑"
+            elif new_index > old_index:
+                move = "↓"
             else:
-                op = "--"
-            logging.info(f"{op}{move}{track.short_type} {track}")
-        if len(old_tracks) == len(new_tracks) and list(new_track_order.keys()) == list(
+                move = "-"
+            logging.info(f"++{move}{track.short_type} {track}")
+        for track in old_tracks:
+            if track.id in new_track_order:
+                continue
+            logging.info(f"---{track.short_type} {track}")
+        # for track in old_tracks:
+        #     move = " "
+        #     if track.id in new_track_order:
+        #         old_index = old_track_order[track.id]
+        #         new_index = new_track_order[track.id]
+        #         op = "++"
+        #         if new_index < old_index:
+        #             move = "↑"
+        #         elif new_index > old_index:
+        #             move = "↓"
+        #     else:
+        #         op = "--"
+        #     logging.info(f"{op}{move}{track.short_type} {track}")
+        if len(new_tracks) == len(old_tracks) and list(new_track_order.keys()) == list(
             old_track_order.keys()
         ):
             logging.warning("All tracks will be the same")
@@ -178,7 +193,7 @@ class StreamPruner(Tool):
         args.extend(
             [
                 "--track-order",
-                ",".join(f"0:{t_id}" for t_id in new_tracks.keys()),
+                ",".join(f"0:{t.id}" for t in new_tracks),
             ]
         )
         args.append(media_file)
@@ -229,7 +244,6 @@ class StreamPruner(Tool):
         parser.add_argument(
             "-s",
             "--subtitle-lang",
-            required=True,
             nargs="*",
             help="list of language codes to keep and in which order. (uses 3 letter ISO 639-3 codes)",
         )
