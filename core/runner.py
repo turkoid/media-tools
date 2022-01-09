@@ -38,6 +38,8 @@ def run(args_without_script: list[str]):
     try:
         if parsed_args.tool == "split":
             tool = SmartSplitter(parsed_args)
+        elif parsed_args.tool == "prune":
+            tool = StreamPruner(parsed_args)
         else:
             raise ValueError(f"invalid tool: {parsed_args.tool}")
         tool.run()
