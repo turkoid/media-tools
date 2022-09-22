@@ -1,6 +1,7 @@
 import itertools
 import logging
 import os
+import time
 from typing import Optional, TypeVar
 
 from core.config import Config
@@ -17,6 +18,7 @@ class StreamPruner(Tool):
         self.dry_run = parsed_args.dry_run
         self.config = Config(parsed_args.config)
         self.input = os.path.abspath(parsed_args.input)
+        self.recursive = parsed_args.recursive
         if os.path.isdir(self.input):
             self.input_directory = self.input
         else:
@@ -132,6 +134,7 @@ class StreamPruner(Tool):
             logging.warning("All tracks will be the same")
 
     def prune_media(self, media_file: str):
+        prune_start = time.perf_counter()
         data = MkvData(media_file, identify(self.config.mkvmerge, media_file))
         log_file_header(media_file)
         if not data.is_valid():
@@ -155,7 +158,9 @@ class StreamPruner(Tool):
             return
         new_tracks = list(itertools.chain(video_tracks, audio_tracks, subtitle_tracks))
         self._output_track_operations(data.tracks, new_tracks)
-        pruned_file = os.path.join(self.output_path, os.path.basename(media_file))
+        pruned_file = os.path.join(
+            self.output_path, os.path.relpath(media_file, start=self.input_directory)
+        )
         args = [
             self.config.mkvmerge,
             "-o",
@@ -192,6 +197,10 @@ class StreamPruner(Tool):
             logging.info("pruning...")
             run_process(args)
             logging.info("...done!")
+        prune_stop = time.perf_counter()
+        elapsed = prune_stop - prune_start
+        logging.info(f"took {elapsed:.3f}s")
+        logging.info(f"output: {pruned_file}")
 
     def prune_files(self, media_files: list[str]):
         for media_file in media_files:
@@ -215,6 +224,9 @@ class StreamPruner(Tool):
             "-i",
             required=True,
             help="path to directory or file. If directory, the script will handle only video files",
+        )
+        parser.add_argument(
+            "--recursive", "-r", action="store_true", help="recursively find all files"
         )
         parser.add_argument(
             "-v",
