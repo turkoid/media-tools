@@ -49,7 +49,7 @@ class StreamPruner(Tool):
             )
 
     def run(self):
-        media_files = self.build_media_files()
+        media_files = self.build_media_files(self.recursive, [self.output_path])
         os.makedirs(self.output_path, exist_ok=True)
         self.prune_files(media_files)
 
