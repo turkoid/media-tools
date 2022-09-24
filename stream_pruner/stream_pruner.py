@@ -109,7 +109,7 @@ class StreamPruner(Tool):
 
     def _output_track_operations(
         self, old_tracks: list[Track], new_tracks: list[Track]
-    ):
+    ) -> bool:
         new_track_order = {t.id: i for i, t in enumerate(new_tracks)}
         old_track_order = {
             t.id: i
@@ -132,6 +132,8 @@ class StreamPruner(Tool):
             old_track_order.keys()
         ):
             logging.warning("All tracks will be the same")
+            return False
+        return True
 
     def prune_media(self, media_file: str):
         prune_start = time.perf_counter()
@@ -157,7 +159,10 @@ class StreamPruner(Tool):
             logging.error(f"No video and/or audio tracks found")
             return
         new_tracks = list(itertools.chain(video_tracks, audio_tracks, subtitle_tracks))
-        self._output_track_operations(data.tracks, new_tracks)
+        tracks_changed = self._output_track_operations(data.tracks, new_tracks)
+        if not tracks_changed:
+            logging.info("...skipped")
+            return
         pruned_file = os.path.join(
             self.output_path, os.path.relpath(media_file, start=self.input_directory)
         )
