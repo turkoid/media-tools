@@ -161,15 +161,22 @@ class StreamPruner(Tool):
         new_tracks = list(itertools.chain(video_tracks, audio_tracks, subtitle_tracks))
         tracks_changed = self._output_track_operations(data.tracks, new_tracks)
         if not tracks_changed:
-            logging.info("...skipped")
+            logging.info("...skipping")
             return
         pruned_file = os.path.join(
             self.output_path, os.path.relpath(media_file, start=self.input_directory)
         )
+        if os.path.exists(pruned_file):
+            logging.warning("output file already exists...skipping")
+            return
+        temp_pruned_file = f"{pruned_file}.partial"
+        if os.path.exists(temp_pruned_file):
+            logging.debug("removing partial file")
+            os.remove(temp_pruned_file)
         args = [
             self.config.mkvmerge,
             "-o",
-            pruned_file,
+            temp_pruned_file,
             "--video-tracks",
             ",".join(str(t.id) for t in video_tracks),
             "--audio-tracks",
@@ -201,6 +208,7 @@ class StreamPruner(Tool):
         else:
             logging.info("pruning...")
             run_process(args)
+            os.rename(temp_pruned_file, pruned_file)
             logging.info("...done!")
         prune_stop = time.perf_counter()
         elapsed = prune_stop - prune_start
