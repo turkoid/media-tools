@@ -60,6 +60,12 @@ def parse_timestamp(timestamp: str) -> Decimal:
     return Decimal(f"{seconds}.{fractional}")
 
 
+def parse_duration(duration_str: str) -> Decimal:
+    if ":" in duration_str:
+        return parse_timestamp(duration_str)
+    return Decimal(duration_str)
+
+
 def fps_adjusted_frame(secs: Decimal, fps: Decimal) -> int:
     return round(fps * secs)
 
@@ -105,7 +111,10 @@ def monitor_handbrake_encode(buffer: bytes, progress_bar: tqdm, data: dict[str, 
         perc = current_line[enc_start + len(ENC_START) : perc_index]
         current_line = current_line[perc_index + 1 :]
         if perc:
-            progress_bar.update(float(perc) - progress_bar.n)
+            try:
+                progress_bar.update(float(perc) - progress_bar.n)
+            except ValueError:
+                pass
     data["current_line"] = current_line
 
 

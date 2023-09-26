@@ -23,11 +23,11 @@ from smart_splitter.models import (
 from core.utils import (
     init_logging_handler,
     log_multiline,
-    parse_timestamp,
     format_timestamp,
     run_process,
     async_run_process,
     monitor_handbrake_encode,
+    parse_duration,
 )
 
 
@@ -131,10 +131,13 @@ class Media:
         return self.cache[cache_key]
 
     def stream_duration(self, stream_type: str) -> Decimal:
-        tags: dict[str, Any] = getattr(self, f"{stream_type}_streams")[0]["tags"]
+        stream_info: dict[str, Any] = getattr(self, f"{stream_type}_streams")[0]
+        tags: dict[str, Any] = stream_info["tags"]
         for k, v in tags.items():
             if "duration" in k.lower():
-                return parse_timestamp(v)
+                return parse_duration(v)
+        if "duration" in stream_info:
+            return parse_duration(stream_info["duration"])
         raise ValueError("no duration tag found!!")
 
     def stream_frame_count(self, stream_type: str) -> int:
