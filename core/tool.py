@@ -41,7 +41,7 @@ class Tool(ABC):
         logging.debug(f"finding media files in {self.input}")
         media_files = []
         for root_dir, dirs, files in os.walk(self.input):
-            if root_dir in ignore_dirs:
+            if ignore_dirs and root_dir in ignore_dirs:
                 continue
             for file in files:
                 file_path = os.path.join(root_dir, file)
