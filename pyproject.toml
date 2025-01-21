@@ -1,0 +1,20 @@
+[project]
+name = "media-tools"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncio>=3.4.3",
+    "python-magic-bin>=0.4.14",
+    "pyyaml>=6.0.2",
+    "tqdm>=4.67.1",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.9.2",
+]
+
+[tool.ruff]
+line-length = 120
