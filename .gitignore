@@ -3,4 +3,5 @@ sandbox/sandbox.py
 /sandbox
 config.yaml
 script.py
-examples/
+examples
+*.log
